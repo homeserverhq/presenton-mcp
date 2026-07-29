@@ -181,6 +181,9 @@ class PresentonClient:
     async def create_template_async(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return _denormalize_response(await self.post("/api/v1/ppt/templates/async", api_key, json=payload))
 
+    async def create_template_init(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
+        return _denormalize_response(await self.post("/api/v1/ppt/templates/init", api_key, json=payload))
+
     async def create_template_layouts(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
         return _denormalize_response(await self.post("/api/v1/ppt/templates/layouts/create", api_key, json=payload))
 
@@ -266,9 +269,6 @@ class PresentonClient:
         if not include_all_fields and isinstance(data, list):
             data = _filter_fields(data, COMMON_FIELDS["image"])
         return _denormalize_response(data)
-
-    async def delete_image_by_id(self, image_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.delete(f"/api/v1/ppt/images/{image_id}", api_key)
 
     # =========================================================================
     # Icons

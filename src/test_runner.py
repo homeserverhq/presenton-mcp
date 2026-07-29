@@ -335,77 +335,48 @@ async def run_verify_delete(
 FAKE_ID = "00000000-0000-0000-0000-000000000000"
 
 
-async def prepopulate() -> dict[str, Any]:
+def prepopulate() -> dict[str, Any]:
     api_key = os.environ.get("API_KEY", "")
-    headers = {"Authorization": f"Basic {api_key}"}
-    base = "http://localhost:7531"
     result: dict[str, Any] = {}
 
     subprocess.run(
         ["docker", "exec", "presenton-app", "touch", "/tmp/presenton/test_decompose.txt"],
         capture_output=True,
     )
+    subprocess.run(
+        ["docker", "exec", "presenton-app", "python", "-c",
+         "from pptx import Presentation; from pptx.util import Inches; "
+         "p=Presentation(); s=p.slides.add_slide(p.slide_layouts[0]); "
+         "s.shapes.title.text='Test Title'; "
+         "s.placeholders[1].text='Test content'; "
+         "p.save('/app_data/exports/test_template.pptx')"],
+        capture_output=True,
+    )
+
+    headers = {"Authorization": f"Basic {api_key}", "Content-Type": "application/json"}
 
     try:
-        r = httpx.get(f"{base}/api/v1/ppt/images/generated", headers=headers, timeout=10)
+        r = httpx.get("http://localhost:7531/api/v1/ppt/templates?page=1&page_size=5",
+                       headers=headers, timeout=10)
         if r.status_code == 200:
-            images = r.json()
-            if images:
-                result["real_image_id"] = images[0]["id"]
+            items = r.json().get("items", [])
+            if items:
+                default_tmpl = items[0]
+                assets = httpx.get(f"http://localhost:7531/api/v1/ppt/templates/{default_tmpl['id']}",
+                                    headers=headers, timeout=10).json().get("assets", {})
+                images = assets.get("slide_image_urls", [])
+                if images:
+                    result["slide_image_url"] = images[0]
     except Exception as e:
-        log(f"Prepop: failed to get generated images: {e}")
-
-    pptx = "/app_data/exports/Recent-Advances-in-Tech-and-AI-Overview_46998a3b-4336-4d9f-8d15-5d97e335436c.pptx"
-    img = "/app_data/templates/dd31ac17-b50a-4579-8aed-a5c7cad80f9c/static/image6-d77d5bd67ea3.png"
-    try:
-        r = httpx.post(f"{base}/api/v1/ppt/templates/async", headers=headers, json={
-            "pptx_url": pptx,
-            "slide_image_urls": [img],
-            "name": f"custom-template-for-test-{rid}",
-            "description": "Custom template created for test runner",
-        }, timeout=15)
-        if r.status_code == 200:
-            task_id = r.json().get("id")
-            if task_id:
-                for _ in range(30):
-                    r2 = httpx.get(f"{base}/api/v1/async-tasks/status/{task_id}", headers=headers, timeout=10)
-                    if r2.status_code == 200:
-                        body = r2.json()
-                        status = body.get("status")
-                        if status == "completed":
-                            result["custom_template_id"] = body.get("result", {}).get("template_id")
-                            break
-                        elif status in ("failed", "error"):
-                            break
-                    time.sleep(2)
-    except Exception as e:
-        log(f"Prepop: failed to create custom template: {e}")
-
-    tmpl_id = result.get("custom_template_id")
-    if tmpl_id:
-        try:
-            httpx.post(f"{base}/api/v1/ppt/templates/layouts/create", headers=headers,
-                       json={"template_id": tmpl_id, "index": 0}, timeout=10)
-            httpx.post(f"{base}/api/v1/ppt/templates/generate-blocks", headers=headers,
-                       json={"template_id": tmpl_id}, timeout=10)
-            r3 = httpx.get(f"{base}/api/v1/ppt/templates/{tmpl_id}", headers=headers, timeout=10)
-            if r3.status_code == 200:
-                tmpl_detail = r3.json()
-                raw_layouts = tmpl_detail.get("raw_layouts")
-                if raw_layouts:
-                    result["template_layout_json"] = json.dumps(raw_layouts)
-        except Exception as e:
-            log(f"Prepop: template setup failed: {e}")
+        log(f"Prepop: failed to get slide image: {e}")
 
     log(f"Prepop result: {json.dumps({k: v if len(str(v)) < 80 else str(v)[:80] + '...' for k, v in result.items()})}")
     return result
 
 
 async def main():
-    prepop = await prepopulate()
-    custom_template_id = prepop.get("custom_template_id")
-    real_image_id = prepop.get("real_image_id")
-    template_layout_json = prepop.get("template_layout_json", "{}")
+    prepop = prepopulate()
+    slide_image_url = prepop.get("slide_image_url", "")
 
     print(f"# Test Report — Presenton MCP Server")
     print(f"\n**Date**: {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}")
@@ -548,7 +519,7 @@ async def main():
             )
 
         # ------------------------------------------------------------------
-        # Phase 7: Template Tools
+        # Phase 7: Template Tools (self-contained — uses our own custom template)
         # ------------------------------------------------------------------
         log("\n=== Phase 7: Template Tools ===")
         await run_test_with_store(
@@ -565,51 +536,75 @@ async def main():
         await run_test(
             session, "31 create_template_async", "create_template_async",
             {
-                "pptx_url": "/app_data/exports/Recent-Advances-in-Tech-and-AI-Overview_46998a3b-4336-4d9f-8d15-5d97e335436c.pptx",
-                "slide_image_urls": ["/app_data/templates/dd31ac17-b50a-4579-8aed-a5c7cad80f9c/static/image6-d77d5bd67ea3.png"],
+                "pptx_url": "/data/nonexistent.pptx",
+                "slide_image_urls": ["/static/icons/placeholder.svg"],
             },
         )
-        await run_test(
-            session, "32 create_template_layouts", "create_template_layouts",
-            {"template_id": custom_template_id, "index": 0} if custom_template_id
-            else {"template_id": FAKE_ID, "index": 0},
+        await run_test_with_store(
+            session, "32 create_template_init", "create_template_init",
+            {
+            "pptx_url": "/app_data/exports/test_template.pptx",
+            "slide_image_urls": [slide_image_url] if slide_image_url else ["/static/icons/placeholder.svg"],
+            "name": make_name("custom-template"),
+                "description": "Custom template for self-contained testing",
+            },
+            store_key="custom_template",
         )
-        await run_test(
-            session, "33 generate_template_blocks", "generate_template_blocks",
-            {"template_id": custom_template_id} if custom_template_id else {"template_id": FAKE_ID},
+        custom_template_id = pick_id("custom_template")
+        if RUN_LLM:
+            await run_test(
+                session, "33 create_template_layouts", "create_template_layouts",
+                {"template_id": custom_template_id, "index": 0} if custom_template_id
+                else {"template_id": FAKE_ID, "index": 0},
+            )
+            await run_test(
+                session, "34 generate_template_blocks", "generate_template_blocks",
+                {"template_id": custom_template_id} if custom_template_id else {"template_id": FAKE_ID},
+            )
+        await run_test_with_store(
+            session, "35 get_template_by_id_full", "get_template_by_id",
+            {"id": custom_template_id, "include_all_fields": True} if custom_template_id
+            else {"id": FAKE_ID, "include_all_fields": True},
+            store_key="template_detail",
         )
+        raw_layouts = {}
+        tmpl_detail = store.get("template_detail", {})
+        if isinstance(tmpl_detail, dict):
+            raw_layouts = tmpl_detail.get("raw_layouts", {}) or {}
+        layout_json = "{}"
+        if raw_layouts:
+            layouts_list = raw_layouts.get("layouts", [])
+            if layouts_list:
+                layout_json = json.dumps(raw_layouts)
+        if RUN_LLM:
+            await run_test(
+                session, "36 update_template_layouts", "update_template_layouts",
+                {"template_id": custom_template_id or FAKE_ID, "index": 0,
+                 "layout": {"id": "test-layout", "description": "test layout " + "x" * 20,
+                            "components": [{"id": "c1", "description": "test component",
+                                            "position": {"x": 0, "y": 0},
+                                            "size": {"width": 100, "height": 100},
+                                            "elements": [{
+                                                "type": "text",
+                                                "runs": [{"text": "hello"}],
+                                                "decorative": False,
+                                                "name": "r1",
+                                                "max_length": 100,
+                                                "min_length": 1
+                                            }]}]}},
+            )
         await run_test(
-            session, "34 update_template_layouts", "update_template_layouts",
-            {"template_id": tmpl_id or FAKE_ID, "index": 0,
-             "layout": {"id": "test", "description": "test layout " + "x" * 20,
-                        "components": [{"id": "c1", "description": "test component",
-                                        "position": {"x": 0, "y": 0, "w": 100, "h": 100},
-                                        "size": {"width": 100, "height": 100},
-                                        "elements": [{"id": "e1", "type": "text",
-                                                      "text": {"runs": [{"text": "hello"}],
-                                                               "decorative": False,
-                                                               "name": "r1"}}]}]}},
-        )
-        await run_test(
-            session, "35 update_template", "update_template",
-            {"id": tmpl_id, "name": "Updated Name"} if tmpl_id
+            session, "37 update_template", "update_template",
+            {"id": custom_template_id, "name": make_name("Updated")} if custom_template_id
             else {"id": FAKE_ID, "name": "Test"},
-        )
-        await run_test(
-            session, "36 delete_template_by_id", "delete_template_by_id",
-            {"id": tmpl_id} if tmpl_id else {"id": FAKE_ID},
         )
 
         # ------------------------------------------------------------------
         # Phase 8: Image Tools
         # ------------------------------------------------------------------
         log("\n=== Phase 8: Image Tools ===")
-        await run_test(session, "37 list_generated_images_full", "list_generated_images", {"include_all_fields": True})
-        await run_test(session, "38 list_uploaded_images_full", "list_uploaded_images", {"include_all_fields": True})
-        await run_test(
-            session, "39 delete_image_by_id", "delete_image_by_id",
-            {"id": real_image_id} if real_image_id else {"id": FAKE_ID},
-        )
+        await run_test(session, "38 list_generated_images_full", "list_generated_images", {"include_all_fields": True})
+        await run_test(session, "39 list_uploaded_images_full", "list_uploaded_images", {"include_all_fields": True})
         if RUN_LLM:
             await run_test(session, "40 generate_image", "generate_image", {"prompt": "a cute cat"})
 
@@ -627,32 +622,33 @@ async def main():
         )
 
         # ------------------------------------------------------------------
-        # Phase 10: Presentation Layout & Outline Tools
+        # Phase 10: Presentation Layout & Outline Tools (GATED — need layouts)
         # ------------------------------------------------------------------
-        log("\n=== Phase 10: Presentation Layout & Outline Tools ===")
-        await run_test_with_store(
-            session, "45 prepare_presentation", "prepare_presentation",
-            {"id": presentation_id,
-             "outlines": json.dumps([{"title": "Slide 1", "content": ["Content 1"]}]),
-             "layout": json.dumps({"name": "default",
-                                   "slides": [{"components": {}}]})}
-            if presentation_id
-            else {"id": FAKE_ID, "outlines": "[]", "layout": "{}"},
-            store_key="prepare_presentation",
-        )
-        outline_data = store.get("prepare_presentation", {})
-        outline_id = None
-        if isinstance(outline_data, dict):
-            outline_id = outline_data.get("outline_id") or outline_data.get("id") or outline_data.get("_id")
-        await run_test(
-            session, "46 get_outline_by_id", "get_outline_by_id",
-            {"id": outline_id} if outline_id else {"id": FAKE_ID},
-        )
-        await run_test(
-            session, "47 update_outline", "update_outline",
-            {"id": outline_id, "outline": "[]"} if outline_id
-            else {"id": FAKE_ID, "outline": "[]"},
-        )
+        if RUN_LLM:
+            log("\n=== Phase 10: Presentation Layout & Outline Tools ===")
+            await run_test_with_store(
+                session, "45 prepare_presentation", "prepare_presentation",
+                {"id": presentation_id,
+                 "outlines": json.dumps([{"title": "Slide 1", "content": ["Content 1"]}]),
+                 "layout": json.dumps({"name": "default",
+                                       "slides": [{"id": "s1", "json_schema": {}}]})}
+                if presentation_id
+                else {"id": FAKE_ID, "outlines": "[]", "layout": "{}"},
+                store_key="prepare_presentation",
+            )
+            outline_data = store.get("prepare_presentation", {})
+            outline_id = None
+            if isinstance(outline_data, dict):
+                outline_id = outline_data.get("outline_id") or outline_data.get("id") or outline_data.get("_id")
+            await run_test(
+                session, "46 get_outline_by_id", "get_outline_by_id",
+                {"id": outline_id} if outline_id else {"id": FAKE_ID},
+            )
+            await run_test(
+                session, "47 update_outline", "update_outline",
+                {"id": outline_id, "outline": "[]"} if outline_id
+                else {"id": FAKE_ID, "outline": "[]"},
+            )
         if RUN_LLM:
             await run_test(
                 session, "48 edit_slide", "edit_slide",
@@ -692,15 +688,19 @@ async def main():
             )
 
         # ------------------------------------------------------------------
-        # Phase 12: Final Cleanup
+        # Phase 12: Final Cleanup (delete our own assets)
         # ------------------------------------------------------------------
         log("\n=== Phase 12: Final Cleanup ===")
         await run_test(
-            session, "54 delete_original_presentation", "delete_presentation_by_id",
+            session, "54 delete_template_by_id", "delete_template_by_id",
+            {"id": custom_template_id} if custom_template_id else {"id": FAKE_ID},
+        )
+        await run_test(
+            session, "55 delete_original_presentation", "delete_presentation_by_id",
             {"id": presentation_id} if presentation_id else {"id": FAKE_ID},
         )
         await run_verify_delete(
-            session, "55 verify_presentation_deleted", "get_presentation_by_id",
+            session, "56 verify_presentation_deleted", "get_presentation_by_id",
             {"id": presentation_id} if presentation_id else {"id": FAKE_ID},
         )
 

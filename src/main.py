@@ -430,6 +430,34 @@ async def create_template_async(
 
 
 @mcp.tool(tags={"write", "primary", "presenton"})
+async def create_template_init(
+    pptx_url: str,
+    slide_image_urls: list[str],
+    name: str = "",
+    description: str = "",
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Create a template synchronously from a PPTX file path (no async worker needed).
+
+    Args:
+        pptx_url: Path to the PPTX file on the backend server.
+        slide_image_urls: List of slide preview image URLs, one per slide.
+        name: Template name.
+        description: Template description.
+    """
+    payload = {
+        "pptx_url": pptx_url,
+        "slide_image_urls": slide_image_urls,
+    }
+    if name:
+        payload["name"] = name
+    if description:
+        payload["description"] = description
+    template_id = await get_client().create_template_init(payload, get_user_token())
+    return {"id": template_id}
+
+
+@mcp.tool(tags={"write", "primary", "presenton"})
 async def create_template_layouts(
     template_id: str,
     index: Optional[int] = None,
@@ -708,20 +736,6 @@ async def list_uploaded_images(
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
-
-
-@mcp.tool(tags={"write", "basic", "presenton"})
-async def delete_image_by_id(
-    id: str,
-    ctx: Context = None,
-) -> dict[str, Any]:
-    """Delete an image by its ID.
-
-    Args:
-        id: The unique ID of the image to delete.
-    """
-    await get_client().delete_image_by_id(id, get_user_token())
-    return {"deleted": True, "id": id}
 
 
 @mcp.tool(tags={"read", "primary", "presenton"})
