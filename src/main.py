@@ -310,7 +310,7 @@ async def create_presentation(
     web_search: bool = False,
     ctx: Context = None,
 ) -> dict[str, Any]:
-    """Create a new presentation with AI-generated slides. This runs asynchronously — returns a task_id immediately. Poll get_async_task_status with the task_id until status is "completed", then use the presentation_id from the task data to fetch the presentation.
+    """Create a new presentation with AI-generated slides. This runs asynchronously — returns a task_id and presentation_url immediately. Use get_presentation_generation_status(task_id) to check progress (takes a few minutes), or just access via presentation_url.
 
     Args:
         content: The content to generate the presentation from (e.g. '# AI Trends\\n\\nOverview...').

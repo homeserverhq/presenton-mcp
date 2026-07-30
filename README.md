@@ -31,6 +31,7 @@ with full CRUD and AI-powered generation capabilities.
 | `MCP_SERVER_PORT` | Yes | Port number the MCP server listens on |
 | `ALLOW_ALL_AGGREGATE` | No | When `true`, aggregate listing tools honor the `include_all_fields` parameter. When `false` (default), the parameter is silently forced to `False` for aggregate list operations. |
 | `IS_STATEFUL` | No | When `true`, uses stateful Streamable HTTP with session tracking. When `false` (default), uses stateless mode. |
+| `PRESENTON_PUBLIC_URL` | No | Public-facing URL to replace internal URLs in presentation responses. Defaults to `PRESENTON_BASE_URL` if not set. |
 
 ## 📦 Installation & Local Development
 

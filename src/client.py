@@ -14,7 +14,7 @@ COMMON_FIELDS: dict[str, set[str]] = {
     "image": {"id", "file_url", "created_at"},
     "chat_conversation": {"id", "presentation_id", "created_at"},
     "chat_message": {"id", "role", "content", "created_at"},
-    "async_task": {"id", "type", "status", "message", "created_at"},
+    "async_task": {"id", "type", "status", "message", "created_at", "data"},
     "outline": {"id", "content", "updated_at"},
     "slide": {"id", "title", "content", "updated_at"},
 }
@@ -65,11 +65,25 @@ def _denormalize_response(data: Any) -> Any:
 class PresentonClient:
     def __init__(self, base_url: Optional[str] = None):
         self.base_url = (base_url or os.getenv("PRESENTON_BASE_URL", "")).rstrip("/")
+        self.public_url = os.getenv("PRESENTON_PUBLIC_URL", "").rstrip("/") or self.base_url
         if not self.base_url:
             raise ValueError(
                 "Presenton URL required. Set PRESENTON_BASE_URL env var "
                 "or pass base_url."
             )
+
+    def _add_presentation_url(self, data: Any) -> Any:
+        if not isinstance(data, dict) or not self.public_url:
+            return data
+        pid = data.get("id")
+        if pid:
+            data["presentation_url"] = f"{self.public_url}/presentation?id={pid}"
+        inner = data.get("data")
+        if isinstance(inner, dict):
+            inner_pid = inner.get("presentation_id")
+            if inner_pid:
+                inner["presentation_url"] = f"{self.public_url}/presentation?id={inner_pid}"
+        return data
 
     def _get_headers(self, api_key: Optional[str] = None) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -123,7 +137,10 @@ class PresentonClient:
         data = await self.get("/api/v1/ppt/presentation/all", api_key, params={"include_slides": "false"})
         if not include_all_fields and isinstance(data, list):
             data = _filter_fields(data, COMMON_FIELDS["presentation"])
-        return _denormalize_response(data)
+        data = _denormalize_response(data)
+        if isinstance(data, list):
+            return [self._add_presentation_url(item) for item in data]
+        return data
 
     async def get_presentation_by_id(self, presentation_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get(f"/api/v1/ppt/presentation/{presentation_id}", api_key)
@@ -131,25 +148,25 @@ class PresentonClient:
             raise Exception("Resource not found")
         if not include_all_fields:
             data = _filter_fields(data, COMMON_FIELDS["presentation"])
-        return _denormalize_response(data)
+        return self._add_presentation_url(_denormalize_response(data))
 
     async def create_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.post("/api/v1/ppt/presentation/generate/async", api_key, json=payload)
         if not include_all_fields and isinstance(data, dict):
             data = _filter_fields(data, COMMON_FIELDS["async_task"])
-        return _denormalize_response(data)
+        return self._add_presentation_url(_denormalize_response(data))
 
     async def bootstrap_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.post("/api/v1/ppt/presentation/create", api_key, json=payload)
         if not include_all_fields and isinstance(data, dict):
             data = _filter_fields(data, COMMON_FIELDS["presentation"])
-        return _denormalize_response(data)
+        return self._add_presentation_url(_denormalize_response(data))
 
     async def update_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.patch("/api/v1/ppt/presentation/update", api_key, json=payload)
         if not include_all_fields and isinstance(data, dict):
             data = _filter_fields(data, COMMON_FIELDS["presentation"])
-        return _denormalize_response(data)
+        return self._add_presentation_url(_denormalize_response(data))
 
     async def delete_presentation_by_id(self, presentation_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/v1/ppt/presentation/{presentation_id}", api_key)
@@ -158,7 +175,7 @@ class PresentonClient:
         data = await self.post(f"/api/v1/ppt/presentation/{presentation_id}/duplicate", api_key)
         if not include_all_fields and isinstance(data, dict):
             data = _filter_fields(data, COMMON_FIELDS["presentation"])
-        return _denormalize_response(data)
+        return self._add_presentation_url(_denormalize_response(data))
 
     async def get_presentation_generation_status(self, task_id: str, api_key: Optional[str] = None) -> Any:
         return _denormalize_response(await self.get(f"/api/v1/ppt/presentation/status/{task_id}", api_key))
