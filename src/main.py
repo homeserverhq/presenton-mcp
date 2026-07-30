@@ -334,7 +334,8 @@ async def create_presentation(
         include_title_slide=include_title_slide, web_search=web_search,
     )
     return await get_client().create_presentation(
-        params.model_dump(exclude_unset=True), get_user_token()
+        params.model_dump(exclude_unset=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
     )
 
 
@@ -375,7 +376,7 @@ async def update_presentation(
     p = params.model_dump(exclude_unset=True, exclude_none=True)
     if not any(v is not None for v in p.values()):
         raise ValueError("At least one field to update must be provided")
-    return await get_client().update_presentation(p, get_user_token())
+    return await get_client().update_presentation(p, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
 @mcp.tool(tags={"write", "basic", "presenton"})
@@ -402,7 +403,7 @@ async def duplicate_presentation(
     Args:
         id: The unique ID of the presentation to duplicate (e.g. 'a1b2c3d4-...').
     """
-    return await get_client().duplicate_presentation(id, get_user_token())
+    return await get_client().duplicate_presentation(id, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
 @mcp.tool(tags={"write", "primary", "presenton"})
@@ -443,7 +444,8 @@ async def generate_presentation_async(
         include_title_slide=include_title_slide,
     )
     return await get_client().generate_presentation_async(
-        params.model_dump(exclude_unset=True), get_user_token()
+        params.model_dump(exclude_unset=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
     )
 
 
@@ -480,7 +482,8 @@ async def edit_presentation(
         export_as=export_as,
     )
     return await get_client().edit_presentation(
-        params.model_dump(exclude_unset=True), get_user_token()
+        params.model_dump(exclude_unset=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
     )
 
 
@@ -504,7 +507,8 @@ async def derive_presentation(
         export_as=export_as,
     )
     return await get_client().derive_presentation(
-        params.model_dump(exclude_unset=True), get_user_token()
+        params.model_dump(exclude_unset=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
     )
 
 
@@ -524,7 +528,7 @@ async def prepare_presentation(
     """
     outlines_list = [o.model_dump() for o in outlines]
     payload = {"presentation_id": id, "outlines": outlines_list, "layout": layout}
-    return await get_client().prepare_presentation(payload, get_user_token())
+    return await get_client().prepare_presentation(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
 # =============================================================================
@@ -598,7 +602,7 @@ async def create_template_async(
         payload["name"] = name
     if description:
         payload["description"] = description
-    return await get_client().create_template_async(payload, get_user_token())
+    return await get_client().create_template_async(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
 @mcp.tool(tags={"write", "primary", "presenton"})
@@ -625,7 +629,7 @@ async def create_template_init(
         payload["name"] = name
     if description:
         payload["description"] = description
-    template_id = await get_client().create_template_init(payload, get_user_token())
+    template_id = await get_client().create_template_init(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
     return {"id": template_id}
 
 
@@ -648,7 +652,7 @@ async def create_template_layouts(
         payload["index"] = index
     if indices is not None:
         payload["indices"] = indices
-    return await get_client().create_template_layouts(payload, get_user_token())
+    return await get_client().create_template_layouts(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
 @mcp.tool(tags={"write", "advanced", "presenton"})
@@ -662,7 +666,7 @@ async def generate_template_blocks(
         template_id: The unique ID of the template (e.g. 'a1b2c3d4-...').
     """
     payload = {"template_id": template_id}
-    return await get_client().generate_template_blocks(payload, get_user_token())
+    return await get_client().generate_template_blocks(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
 @mcp.tool(tags={"write", "primary", "presenton"})
@@ -688,7 +692,7 @@ async def update_template_layouts(
         payload["layout"] = layout.model_dump()
     if layouts is not None:
         payload["layouts"] = [l.model_dump() for l in layouts]
-    return await get_client().update_template_layouts(template_id, payload, get_user_token())
+    return await get_client().update_template_layouts(template_id, payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
 @mcp.tool(tags={"write", "basic", "presenton"})
@@ -710,7 +714,7 @@ async def update_template(
         payload["name"] = name
     if description is not None:
         payload["description"] = description
-    return await get_client().update_template(id, payload, get_user_token())
+    return await get_client().update_template(id, payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
 @mcp.tool(tags={"write", "basic", "presenton"})
@@ -787,7 +791,8 @@ async def create_theme(
         company_name=company_name, data=data,
     )
     return await get_client().create_theme(
-        params.model_dump(exclude_unset=True), get_user_token()
+        params.model_dump(exclude_unset=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
     )
 
 
@@ -814,7 +819,7 @@ async def update_theme(
         company_name=company_name, data=data,
     )
     p = params.model_dump(exclude_unset=True, exclude_none=True)
-    return await get_client().update_theme(id, p, get_user_token())
+    return await get_client().update_theme(id, p, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
 @mcp.tool(tags={"write", "basic", "presenton"})
@@ -860,7 +865,8 @@ async def generate_theme(
         text_2=text_2,
     )
     return await get_client().generate_theme(
-        params.model_dump(exclude_unset=True), get_user_token()
+        params.model_dump(exclude_unset=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
     )
 
 
@@ -1045,7 +1051,7 @@ async def update_outline(
         slides: Updated slide outline items (e.g. [{'content': '# Intro\\n\\nOverview...'}]).
     """
     payload = {"slides": [s.model_dump() for s in slides]}
-    return await get_client().update_outline(id, payload, get_user_token())
+    return await get_client().update_outline(id, payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
 @mcp.tool(tags={"write", "primary", "presenton"})
@@ -1062,7 +1068,8 @@ async def edit_slide(
     """
     params = EditSlideParam(id=id, prompt=prompt)
     return await get_client().edit_slide(
-        params.model_dump(exclude_unset=True), get_user_token()
+        params.model_dump(exclude_unset=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
     )
 
 
@@ -1082,7 +1089,8 @@ async def edit_slide_html(
     """
     params = EditSlideHtmlParam(id=id, prompt=prompt, html=html)
     return await get_client().edit_slide_html(
-        params.model_dump(exclude_unset=True), get_user_token()
+        params.model_dump(exclude_unset=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
     )
 
 
@@ -1171,7 +1179,8 @@ async def send_chat_message(
         attachments=attachments,
     )
     return await get_client().send_chat_message(
-        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
     )
 
 

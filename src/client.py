@@ -13,7 +13,10 @@ COMMON_FIELDS: dict[str, set[str]] = {
     "font": {"id", "name", "family", "size", "postscript_name"},
     "image": {"id", "file_url", "created_at"},
     "chat_conversation": {"id", "presentation_id", "created_at"},
+    "chat_message": {"id", "role", "content", "created_at"},
     "async_task": {"id", "type", "status", "message", "created_at"},
+    "outline": {"id", "content", "updated_at"},
+    "slide": {"id", "title", "content", "updated_at"},
 }
 
 
@@ -130,32 +133,53 @@ class PresentonClient:
             data = _filter_fields(data, COMMON_FIELDS["presentation"])
         return _denormalize_response(data)
 
-    async def create_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/presentation/create", api_key, json=payload))
+    async def create_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/presentation/create", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["presentation"])
+        return _denormalize_response(data)
 
-    async def update_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.patch("/api/v1/ppt/presentation/update", api_key, json=payload))
+    async def update_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.patch("/api/v1/ppt/presentation/update", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["presentation"])
+        return _denormalize_response(data)
 
     async def delete_presentation_by_id(self, presentation_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/v1/ppt/presentation/{presentation_id}", api_key)
 
-    async def duplicate_presentation(self, presentation_id: str, api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post(f"/api/v1/ppt/presentation/{presentation_id}/duplicate", api_key))
+    async def duplicate_presentation(self, presentation_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post(f"/api/v1/ppt/presentation/{presentation_id}/duplicate", api_key)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["presentation"])
+        return _denormalize_response(data)
 
-    async def generate_presentation_async(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/presentation/generate/async", api_key, json=payload))
+    async def generate_presentation_async(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/presentation/generate/async", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["async_task"])
+        return _denormalize_response(data)
 
     async def get_presentation_generation_status(self, task_id: str, api_key: Optional[str] = None) -> Any:
         return _denormalize_response(await self.get(f"/api/v1/ppt/presentation/status/{task_id}", api_key))
 
-    async def edit_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/presentation/edit", api_key, json=payload))
+    async def edit_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/presentation/edit", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["presentation"])
+        return _denormalize_response(data)
 
-    async def derive_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/presentation/derive", api_key, json=payload))
+    async def derive_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/presentation/derive", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["presentation"])
+        return _denormalize_response(data)
 
-    async def prepare_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/presentation/prepare", api_key, json=payload))
+    async def prepare_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/presentation/prepare", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["presentation"])
+        return _denormalize_response(data)
 
     # =========================================================================
     # Templates
@@ -178,23 +202,41 @@ class PresentonClient:
             data = _filter_fields(data, COMMON_FIELDS["template"])
         return _denormalize_response(data)
 
-    async def create_template_async(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/template/async", api_key, json=payload))
+    async def create_template_async(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/template/async", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["template"])
+        return _denormalize_response(data)
 
-    async def create_template_init(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/template/init", api_key, json=payload))
+    async def create_template_init(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/template/init", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["template"])
+        return _denormalize_response(data)
 
-    async def create_template_layouts(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/template/layouts/create", api_key, json=payload))
+    async def create_template_layouts(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/template/layouts/create", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["template"])
+        return _denormalize_response(data)
 
-    async def generate_template_blocks(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/template/generate-blocks", api_key, json=payload))
+    async def generate_template_blocks(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/template/generate-blocks", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["template"])
+        return _denormalize_response(data)
 
-    async def update_template_layouts(self, template_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.patch(f"/api/v1/ppt/template/{template_id}/layouts", api_key, json=payload))
+    async def update_template_layouts(self, template_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.patch(f"/api/v1/ppt/template/{template_id}/layouts", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["template"])
+        return _denormalize_response(data)
 
-    async def update_template(self, template_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.patch(f"/api/v1/ppt/template/{template_id}", api_key, json=payload))
+    async def update_template(self, template_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.patch(f"/api/v1/ppt/template/{template_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["template"])
+        return _denormalize_response(data)
 
     async def delete_template_by_id(self, template_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/v1/ppt/template/{template_id}", api_key)
@@ -215,17 +257,26 @@ class PresentonClient:
             data = _filter_fields(data, COMMON_FIELDS["theme"])
         return _denormalize_response(data)
 
-    async def create_theme(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/themes/create", api_key, json=payload))
+    async def create_theme(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/themes/create", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["theme"])
+        return _denormalize_response(data)
 
-    async def update_theme(self, theme_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.patch(f"/api/v1/ppt/themes/update/{theme_id}", api_key, json=payload))
+    async def update_theme(self, theme_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.patch(f"/api/v1/ppt/themes/update/{theme_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["theme"])
+        return _denormalize_response(data)
 
     async def delete_theme_by_id(self, theme_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/v1/ppt/themes/delete/{theme_id}", api_key)
 
-    async def generate_theme(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/theme/generate", api_key, json=payload))
+    async def generate_theme(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/theme/generate", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["theme"])
+        return _denormalize_response(data)
 
     # =========================================================================
     # Fonts
@@ -282,20 +333,31 @@ class PresentonClient:
         data = await self.get(f"/api/v1/ppt/outlines/{outline_id}", api_key)
         if data is None:
             raise Exception("Resource not found")
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["outline"])
         return _denormalize_response(data)
 
-    async def update_outline(self, outline_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.put(f"/api/v1/ppt/outlines/{outline_id}", api_key, json=payload))
+    async def update_outline(self, outline_id: str, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.put(f"/api/v1/ppt/outlines/{outline_id}", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["outline"])
+        return _denormalize_response(data)
 
     # =========================================================================
     # Slides
     # =========================================================================
 
-    async def edit_slide(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/slide/edit", api_key, json=payload))
+    async def edit_slide(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/slide/edit", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["slide"])
+        return _denormalize_response(data)
 
-    async def edit_slide_html(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/slide/edit-html", api_key, json=payload))
+    async def edit_slide_html(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/slide/edit-html", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["slide"])
+        return _denormalize_response(data)
 
     # =========================================================================
     # Files
@@ -316,13 +378,18 @@ class PresentonClient:
 
     async def get_chat_history(self, presentation_id: str, conversation_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.get(f"/api/v1/ppt/chat/history?presentation_id={presentation_id}&conversation_id={conversation_id}", api_key)
+        if not include_all_fields and isinstance(data, list):
+            data = _filter_fields(data, COMMON_FIELDS["chat_message"])
         return _denormalize_response(data)
 
     async def delete_chat_conversation(self, presentation_id: str, conversation_id: str, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/v1/ppt/chat/conversation?presentation_id={presentation_id}&conversation_id={conversation_id}", api_key)
 
-    async def send_chat_message(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/chat/message", api_key, json=payload))
+    async def send_chat_message(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/chat/message", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["chat_message"])
+        return _denormalize_response(data)
 
     # =========================================================================
     # Async Tasks
