@@ -662,7 +662,7 @@ async def main():
             await run_test_with_store(
                 session, "44 prepare_presentation", "prepare_presentation",
                 {"id": presentation_id,
-                 "outlines": json.dumps([{"content": "Introduction to AI trends"}]),
+                 "outlines": [{"content": "Introduction to AI trends"}],
                  "layout": "standard"}
                 if presentation_id
                 else {"id": FAKE_ID, "outlines": "[]", "layout": "standard"},
@@ -681,8 +681,8 @@ async def main():
             )
             await run_test(
                 session, "46 update_outline", "update_outline",
-                {"id": outline_id, "outline": "[]"} if outline_id
-                else {"id": FAKE_ID, "outline": "[]"},
+                {"id": outline_id, "slides": []} if outline_id
+                else {"id": FAKE_ID, "slides": []},
             )
         if RUN_LLM:
             slide_id = ""
