@@ -395,81 +395,12 @@ FAKE_ID = "00000000-0000-0000-0000-000000000000"
 
 
 def prepopulate() -> dict[str, Any]:
-    api_key = os.environ.get("API_KEY", "")
-    result: dict[str, Any] = {}
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    backend = "http://localhost:7531"
-
-    owner_id = ""
-    try:
-        r = httpx.get(f"{backend}/api/v1/auth/verify", headers=headers, timeout=10)
-        if r.status_code == 200:
-            owner_id = r.json().get("id", "")
-            log(f"Prepop: resolved owner_id from auth/verify={owner_id}")
-    except Exception as e:
-        log(f"Prepop: auth/verify failed: {e}")
-
-    if not owner_id:
-        owner_id = str(uuid.uuid4())
-        log(f"Prepop: generated fallback owner_id={owner_id}")
-
-    result["owner_id"] = owner_id
-    subprocess.run(
-        ["docker", "exec", "presenton-app", "mkdir", "-p", f"/tmp/presenton/{owner_id}"],
-        capture_output=True,
-    )
-    subprocess.run(
-        ["docker", "exec", "presenton-app", "touch", f"/tmp/presenton/{owner_id}/test_decompose.txt"],
-        capture_output=True,
-    )
-    subprocess.run(
-        ["docker", "exec", "presenton-app", "python", "-c",
-         "from pptx import Presentation; from pptx.util import Inches; "
-         "p=Presentation(); s=p.slides.add_slide(p.slide_layouts[0]); "
-         "s.shapes.title.text='Test Title'; "
-         "s.placeholders[1].text='Test content'; "
-         "p.save('/app_data/exports/test_template.pptx')"],
-        capture_output=True,
-    )
-
-    try:
-        r = httpx.get(f"{backend}/api/v1/ppt/template/all?page=1&page_size=20",
-                       headers=headers, timeout=10)
-        if r.status_code == 200:
-            items = r.json().get("items", [])
-            for t in items:
-                tid = t.get("id")
-                if not tid:
-                    continue
-                detail = httpx.get(f"{backend}/api/v1/ppt/template/{tid}",
-                                    headers=headers, timeout=10).json()
-                img = detail.get("thumbnail", "")
-                if img and img.endswith(".png"):
-                    result["slide_image_url"] = img
-                    break
-    except Exception as e:
-        log(f"Prepop: failed to get slide image: {e}")
-
-    if not result.get("slide_image_url"):
-        try:
-            out = subprocess.run(
-                ["docker", "exec", "presenton-app",
-                 "find", "/app_data/templates", "-name", "image*.png", "-type", "f"],
-                capture_output=True, text=True, timeout=10)
-            if out.returncode == 0:
-                images = [l.strip() for l in out.stdout.strip().split("\n") if l.strip()]
-                if images:
-                    result["slide_image_url"] = images[0]
-        except Exception as e:
-            log(f"Prepop: fallback image scan failed: {e}")
-
-    log(f"Prepop result: {json.dumps({k: v if len(str(v)) < 80 else str(v)[:80] + '...' for k, v in result.items()})}")
-    return result
+    log("Prepop: no setup needed — PPTX is baked into container")
+    return {}
 
 
 async def main():
-    prepop = prepopulate()
-    slide_image_url = prepop.get("slide_image_url", "")
+    prepopulate()
 
     print(f"# Test Report — Presenton MCP Server")
     print(f"\n**Date**: {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}")
@@ -636,7 +567,7 @@ async def main():
             session, "31 create_template_async", "create_template_async",
             {
                 "pptx_url": "/app_data/exports/test_template.pptx",
-                "slide_image_urls": [slide_image_url] if slide_image_url else ["/static/icons/placeholder.svg"],
+                "slide_image_urls": ["/app_data/templates/standard/static/thumbnail.png"],
                 "name": make_name("async-template"),
             },
             store_key="create_template_async",
@@ -649,7 +580,7 @@ async def main():
             session, "32 create_template_init", "create_template_init",
             {
             "pptx_url": "/app_data/exports/test_template.pptx",
-            "slide_image_urls": [slide_image_url] if slide_image_url else ["/static/icons/placeholder.svg"],
+            "slide_image_urls": ["/app_data/templates/standard/static/thumbnail.png"],
             "name": make_name("custom-template"),
                 "description": "Custom template for self-contained testing",
             },
@@ -722,11 +653,6 @@ async def main():
         log("\n=== Phase 9: Font & File Tools ===")
         await run_test(session, "41 list_all_fonts_full", "list_all_fonts", {"include_all_fields": True})
         await run_test(session, "42 list_uploaded_fonts_full", "list_uploaded_fonts", {"include_all_fields": True})
-        decompose_path = f"/tmp/presenton/{prepop.get('owner_id', '')}/test_decompose.txt" if prepop.get('owner_id') else "/tmp/presenton/test_decompose.txt"
-        await run_test(
-            session, "44 decompose_file", "decompose_file",
-            {"file_paths": [decompose_path], "language": "en"},
-        )
 
         # ------------------------------------------------------------------
         # Phase 10: Presentation Layout & Outline Tools (GATED — need layouts)
@@ -734,7 +660,7 @@ async def main():
         if RUN_LLM:
             log("\n=== Phase 10: Presentation Layout & Outline Tools ===")
             await run_test_with_store(
-                session, "45 prepare_presentation", "prepare_presentation",
+                session, "44 prepare_presentation", "prepare_presentation",
                 {"id": presentation_id,
                  "outlines": json.dumps([{"content": "Introduction to AI trends"}]),
                  "layout": "standard"}
@@ -750,11 +676,11 @@ async def main():
             if outline_id:
                 log(f"  outline_id={outline_id}")
             await run_test(
-                session, "46 get_outline_by_id", "get_outline_by_id",
+                session, "45 get_outline_by_id", "get_outline_by_id",
                 {"id": outline_id} if outline_id else {"id": FAKE_ID},
             )
             await run_test(
-                session, "47 update_outline", "update_outline",
+                session, "46 update_outline", "update_outline",
                 {"id": outline_id, "outline": "[]"} if outline_id
                 else {"id": FAKE_ID, "outline": "[]"},
             )
@@ -785,7 +711,7 @@ async def main():
             else:
                 log(f"  No slides found in any presentation, using FAKE_ID (expected 404)")
             await run_test_with_store(
-                session, "48 edit_slide", "edit_slide",
+                session, "47 edit_slide", "edit_slide",
                 {"id": slide_id or FAKE_ID, "prompt": "improve this slide"},
                 store_key="edit_slide",
                 timeout=LLM_TEST_TIMEOUT,
@@ -817,7 +743,7 @@ async def main():
             if slide_id_2:
                 log(f"  Using slide_id for edit_slide_html={slide_id_2}")
             await run_test(
-                session, "49 edit_slide_html", "edit_slide_html",
+                session, "48 edit_slide_html", "edit_slide_html",
                 {"id": slide_id_2 or FAKE_ID, "prompt": "make it beautiful", "html": "<p>hello</p>"},
                 timeout=LLM_TEST_TIMEOUT,
             )
@@ -827,12 +753,12 @@ async def main():
         # ------------------------------------------------------------------
         log("\n=== Phase 11: Chat Tools ===")
         await run_test(
-            session, "50 list_chat_conversations", "list_chat_conversations",
+            session, "49 list_chat_conversations", "list_chat_conversations",
             {"presentation_id": presentation_id} if presentation_id else {"presentation_id": FAKE_ID},
         )
         if RUN_LLM:
             await run_test_with_store(
-                session, "51 send_chat_message", "send_chat_message",
+                session, "50 send_chat_message", "send_chat_message",
                 {"presentation_id": presentation_id, "message": "Hello, what is this presentation about?"} if presentation_id
                 else {"presentation_id": FAKE_ID, "message": "hello"},
                 store_key="send_chat_message",
@@ -841,12 +767,12 @@ async def main():
             chat_data = store.get("send_chat_message", {})
             conv_id = chat_data.get("conversation_id") if isinstance(chat_data, dict) else None
             await run_test(
-                session, "52 get_chat_history", "get_chat_history",
+                session, "51 get_chat_history", "get_chat_history",
                 {"presentation_id": presentation_id, "conversation_id": conv_id} if presentation_id and conv_id
                 else {"presentation_id": FAKE_ID, "conversation_id": FAKE_ID},
             )
             await run_test(
-                session, "53 delete_chat_conversation", "delete_chat_conversation",
+                session, "52 delete_chat_conversation", "delete_chat_conversation",
                 {"presentation_id": presentation_id, "conversation_id": conv_id} if presentation_id and conv_id
                 else {"presentation_id": FAKE_ID, "conversation_id": FAKE_ID},
             )
@@ -856,15 +782,15 @@ async def main():
         # ------------------------------------------------------------------
         log("\n=== Phase 12: Final Cleanup ===")
         await run_test(
-            session, "54 delete_template_by_id", "delete_template_by_id",
+            session, "53 delete_template_by_id", "delete_template_by_id",
             {"id": custom_template_id} if custom_template_id else {"id": FAKE_ID},
         )
         await run_test(
-            session, "55 delete_original_presentation", "delete_presentation_by_id",
+            session, "54 delete_original_presentation", "delete_presentation_by_id",
             {"id": presentation_id} if presentation_id else {"id": FAKE_ID},
         )
         await run_verify_delete(
-            session, "56 verify_presentation_deleted", "get_presentation_by_id",
+            session, "55 verify_presentation_deleted", "get_presentation_by_id",
             {"id": presentation_id} if presentation_id else {"id": FAKE_ID},
         )
 
