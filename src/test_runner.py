@@ -239,7 +239,7 @@ async def _run_leak_detection(session: MCPSession) -> None:
         log("  PASS LEAK: no test artifacts found")
 
 
-LLM_TEST_TIMEOUT = 180
+LLM_TEST_TIMEOUT = 120
 
 
 async def run_test(
@@ -349,12 +349,63 @@ async def run_verify_delete(
 FAKE_ID = "00000000-0000-0000-0000-000000000000"
 
 
+def get_slide_id() -> str:
+    try:
+        out = subprocess.run(
+            ["docker", "exec", "presenton-app", "python3", "-c",
+             "import json, sqlite3; db=sqlite3.connect('/app_data/fastapi.db'); "
+             "c=db.cursor(); "
+             "c.execute(\"SELECT s.id FROM slides s JOIN presentations p ON s.presentation = p.id \""
+             "          \"WHERE json_valid(p.layout) AND \""
+             "          \"(json_extract(p.layout, '$.slides') IS NOT NULL \""
+             "          \" OR json_extract(p.layout, '$.layouts') IS NOT NULL) \""
+             "          \"ORDER BY RANDOM() LIMIT 1\"); "
+             "r=c.fetchone(); print(r[0] if r else '')"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            sid = out.stdout.strip()
+            if len(sid) == 32:
+                sid = f"{sid[:8]}-{sid[8:12]}-{sid[12:16]}-{sid[16:20]}-{sid[20:]}"
+            return sid
+    except Exception:
+        pass
+    return ""
+
+
 def prepopulate() -> dict[str, Any]:
     api_key = os.environ.get("API_KEY", "")
     result: dict[str, Any] = {}
 
+    owner_id = ""
+    try:
+        out = subprocess.run(
+            ["docker", "exec", "presenton-app", "ls", "/tmp/presenton/"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if out.returncode == 0:
+            dirs = [d.strip() for d in out.stdout.strip().split("\n") if d.strip()]
+            uuid_dirs = [d for d in dirs if len(d) == 36 and d.count("-") == 4]
+            if uuid_dirs:
+                owner_id = uuid_dirs[0]
+    except Exception as e:
+        log(f"Prepop: owner_id scan failed: {e}")
+
+    if not owner_id:
+        owner_id = str(uuid.uuid4())
+        subprocess.run(
+            ["docker", "exec", "presenton-app", "mkdir", "-p", f"/tmp/presenton/{owner_id}"],
+            capture_output=True, timeout=10,
+        )
+        log(f"Prepop: created owner_id={owner_id}")
+
+    result["owner_id"] = owner_id
     subprocess.run(
-        ["docker", "exec", "presenton-app", "touch", "/tmp/presenton/test_decompose.txt"],
+        ["docker", "exec", "presenton-app", "mkdir", "-p", f"/tmp/presenton/{owner_id}"],
+        capture_output=True,
+    )
+    subprocess.run(
+        ["docker", "exec", "presenton-app", "touch", f"/tmp/presenton/{owner_id}/test_decompose.txt"],
         capture_output=True,
     )
     subprocess.run(
@@ -596,8 +647,20 @@ async def main():
                 timeout=LLM_TEST_TIMEOUT,
             )
             await run_test(
-                session, "34 generate_template_blocks", "generate_template_blocks",
-                {"template_id": custom_template_id} if custom_template_id else {"template_id": FAKE_ID},
+                session, "34 update_template_layouts", "update_template_layouts",
+                {"template_id": custom_template_id or FAKE_ID, "index": 0,
+                 "layout": {"id": "test-layout", "description": "test layout " + "x" * 20,
+                            "components": [{"id": "c1", "description": "test component",
+                                            "position": {"x": 0, "y": 0},
+                                            "size": {"width": 100, "height": 100},
+                                            "elements": [{
+                                                "type": "text",
+                                                "runs": [{"text": "hello"}],
+                                                "decorative": False,
+                                                "name": "r1",
+                                                "max_length": 100,
+                                                "min_length": 1
+                                            }]}]}},
                 timeout=LLM_TEST_TIMEOUT,
             )
         await run_test_with_store(
@@ -617,20 +680,8 @@ async def main():
                 layout_json = json.dumps(raw_layouts)
         if RUN_LLM:
             await run_test(
-                session, "36 update_template_layouts", "update_template_layouts",
-                {"template_id": custom_template_id or FAKE_ID, "index": 0,
-                 "layout": {"id": "test-layout", "description": "test layout " + "x" * 20,
-                            "components": [{"id": "c1", "description": "test component",
-                                            "position": {"x": 0, "y": 0},
-                                            "size": {"width": 100, "height": 100},
-                                            "elements": [{
-                                                "type": "text",
-                                                "runs": [{"text": "hello"}],
-                                                "decorative": False,
-                                                "name": "r1",
-                                                "max_length": 100,
-                                                "min_length": 1
-                                            }]}]}},
+                session, "36 generate_template_blocks", "generate_template_blocks",
+                {"template_id": custom_template_id} if custom_template_id else {"template_id": FAKE_ID},
                 timeout=LLM_TEST_TIMEOUT,
             )
         await run_test(
@@ -654,9 +705,10 @@ async def main():
         log("\n=== Phase 9: Font & File Tools ===")
         await run_test(session, "41 list_all_fonts_full", "list_all_fonts", {"include_all_fields": True})
         await run_test(session, "42 list_uploaded_fonts_full", "list_uploaded_fonts", {"include_all_fields": True})
+        decompose_path = f"/tmp/presenton/{prepop.get('owner_id', '')}/test_decompose.txt" if prepop.get('owner_id') else "/tmp/presenton/test_decompose.txt"
         await run_test(
             session, "44 decompose_file", "decompose_file",
-            {"file_paths": ["/tmp/presenton/test_decompose.txt"], "language": "en"},
+            {"file_paths": [decompose_path], "language": "en"},
         )
 
         # ------------------------------------------------------------------
@@ -677,7 +729,9 @@ async def main():
             outline_data = store.get("prepare_presentation", {})
             outline_id = None
             if isinstance(outline_data, dict):
-                outline_id = outline_data.get("outline_id") or outline_data.get("id") or outline_data.get("_id")
+                outline_id = outline_data.get("presentation_id") or outline_data.get("outline_id") or outline_data.get("id") or outline_data.get("_id")
+            if outline_id:
+                log(f"  outline_id={outline_id}")
             await run_test(
                 session, "46 get_outline_by_id", "get_outline_by_id",
                 {"id": outline_id} if outline_id else {"id": FAKE_ID},
@@ -688,14 +742,19 @@ async def main():
                 else {"id": FAKE_ID, "outline": "[]"},
             )
         if RUN_LLM:
+            slide_id = get_slide_id()
+            if slide_id:
+                log(f"  Using real slide_id={slide_id}")
+            else:
+                log(f"  No slide in DB, using FAKE_ID (expected 404)")
             await run_test(
                 session, "48 edit_slide", "edit_slide",
-                {"id": FAKE_ID, "prompt": "improve this slide"},
+                {"id": slide_id or FAKE_ID, "prompt": "improve this slide"},
                 timeout=LLM_TEST_TIMEOUT,
             )
             await run_test(
                 session, "49 edit_slide_html", "edit_slide_html",
-                {"id": FAKE_ID, "prompt": "make it beautiful", "html": "<p>hello</p>"},
+                {"id": slide_id or FAKE_ID, "prompt": "make it beautiful", "html": "<p>hello</p>"},
                 timeout=LLM_TEST_TIMEOUT,
             )
 

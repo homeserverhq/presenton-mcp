@@ -140,7 +140,7 @@ class DecomposeFileParam(BaseModel):
 class ChatMessageParam(BaseModel):
     presentation_id: str
     message: str
-    conversation_id: str = ""
+    conversation_id: Optional[str] = None
     attachments: Optional[list[dict[str, Any]]] = None
 
 
@@ -778,7 +778,10 @@ async def generate_image(
     Args:
         prompt: Description of the image to generate.
     """
-    return await get_client().generate_image(prompt, get_user_token())
+    result = await get_client().generate_image(prompt, get_user_token())
+    if isinstance(result, str):
+        return {"image_url": result, "prompt": prompt}
+    return result
 
 
 @mcp.tool(tags={"read", "primary", "presenton"})
@@ -1050,11 +1053,11 @@ async def send_chat_message(
     params = ChatMessageParam(
         presentation_id=presentation_id,
         message=message,
-        conversation_id=conversation_id,
+        conversation_id=conversation_id or None,
         attachments=attachments,
     )
     return await get_client().send_chat_message(
-        params.model_dump(exclude_unset=True), get_user_token()
+        params.model_dump(exclude_unset=True, exclude_none=True), get_user_token()
     )
 
 
