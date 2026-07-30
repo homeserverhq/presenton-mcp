@@ -71,7 +71,7 @@ class PresentonClient:
     def _get_headers(self, api_key: Optional[str] = None) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
         if api_key:
-            headers["Authorization"] = f"Basic {api_key}"
+            headers["Authorization"] = f"Bearer {api_key}"
         return headers
 
     async def request(
@@ -162,7 +162,7 @@ class PresentonClient:
     # =========================================================================
 
     async def get_all_templates(self, api_key: Optional[str] = None, include_all_fields: bool = False, page: int = 1, page_size: int = 20) -> Any:
-        data = await self.get(f"/api/v1/ppt/templates?page={page}&page_size={page_size}", api_key)
+        data = await self.get(f"/api/v1/ppt/template/all?page={page}&page_size={page_size}", api_key)
         if isinstance(data, dict):
             items = data.get("items", data)
             if not include_all_fields:
@@ -171,7 +171,7 @@ class PresentonClient:
         return _denormalize_response(data)
 
     async def get_template_by_id(self, template_id: str, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
-        data = await self.get(f"/api/v1/ppt/templates/{template_id}", api_key)
+        data = await self.get(f"/api/v1/ppt/template/{template_id}", api_key)
         if data is None:
             raise Exception("Resource not found")
         if not include_all_fields:
@@ -179,25 +179,25 @@ class PresentonClient:
         return _denormalize_response(data)
 
     async def create_template_async(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/templates/async", api_key, json=payload))
+        return _denormalize_response(await self.post("/api/v1/ppt/template/async", api_key, json=payload))
 
     async def create_template_init(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/templates/init", api_key, json=payload))
+        return _denormalize_response(await self.post("/api/v1/ppt/template/init", api_key, json=payload))
 
     async def create_template_layouts(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/templates/layouts/create", api_key, json=payload))
+        return _denormalize_response(await self.post("/api/v1/ppt/template/layouts/create", api_key, json=payload))
 
     async def generate_template_blocks(self, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.post("/api/v1/ppt/templates/generate-blocks", api_key, json=payload))
+        return _denormalize_response(await self.post("/api/v1/ppt/template/generate-blocks", api_key, json=payload))
 
     async def update_template_layouts(self, template_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.patch(f"/api/v1/ppt/templates/{template_id}/layouts", api_key, json=payload))
+        return _denormalize_response(await self.patch(f"/api/v1/ppt/template/{template_id}/layouts", api_key, json=payload))
 
     async def update_template(self, template_id: str, payload: dict[str, Any], api_key: Optional[str] = None) -> Any:
-        return _denormalize_response(await self.patch(f"/api/v1/ppt/templates/{template_id}", api_key, json=payload))
+        return _denormalize_response(await self.patch(f"/api/v1/ppt/template/{template_id}", api_key, json=payload))
 
     async def delete_template_by_id(self, template_id: str, api_key: Optional[str] = None) -> Any:
-        return await self.delete(f"/api/v1/ppt/templates/{template_id}", api_key)
+        return await self.delete(f"/api/v1/ppt/template/{template_id}", api_key)
 
     # =========================================================================
     # Themes
@@ -244,9 +244,6 @@ class PresentonClient:
         if not include_all_fields and isinstance(result, list):
             result = _filter_fields(result, COMMON_FIELDS["font"])
         return _denormalize_response(result)
-
-    async def delete_font_by_filename(self, filename: str, api_key: Optional[str] = None) -> Any:
-        return await self.delete(f"/api/v1/ppt/fonts/delete/{filename}", api_key)
 
     # =========================================================================
     # Images

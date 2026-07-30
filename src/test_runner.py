@@ -239,15 +239,28 @@ async def _run_leak_detection(session: MCPSession) -> None:
         log("  PASS LEAK: no test artifacts found")
 
 
+LLM_TEST_TIMEOUT = 180
+
+
 async def run_test(
     session: MCPSession,
     label: str,
     tool: str,
     params: dict[str, Any] = None,
+    timeout: int | None = None,
 ) -> bool:
     if params is None:
         params = {}
-    result = await session.call_tool(tool, params)
+    try:
+        coro = session.call_tool(tool, params)
+        result = await (asyncio.wait_for(coro, timeout=timeout) if timeout else coro)
+    except asyncio.TimeoutError:
+        results.append({
+            "label": label, "tool": tool, "status": "FAILED",
+            "reason": "Timed out"
+        })
+        log(f"  FAIL {label}: Timed out after {timeout}s")
+        return False
     err = is_error(result)
     if err:
         results.append({
@@ -270,8 +283,9 @@ async def run_test_with_store(
     tool: str,
     params: dict[str, Any] = None,
     store_key: str = None,
+    timeout: int | None = None,
 ) -> bool:
-    ok = await run_test(session, label, tool, params)
+    ok = await run_test(session, label, tool, params, timeout=timeout)
     if ok and store_key:
         for r in results:
             if r["label"] == label and r["status"] == "PASSED":
@@ -353,22 +367,39 @@ def prepopulate() -> dict[str, Any]:
         capture_output=True,
     )
 
-    headers = {"Authorization": f"Basic {api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    backend = "http://localhost:7531"
 
     try:
-        r = httpx.get("http://localhost:7531/api/v1/ppt/templates?page=1&page_size=5",
+        r = httpx.get(f"{backend}/api/v1/ppt/template/all?page=1&page_size=20",
                        headers=headers, timeout=10)
         if r.status_code == 200:
             items = r.json().get("items", [])
-            if items:
-                default_tmpl = items[0]
-                assets = httpx.get(f"http://localhost:7531/api/v1/ppt/templates/{default_tmpl['id']}",
-                                    headers=headers, timeout=10).json().get("assets", {})
-                images = assets.get("slide_image_urls", [])
-                if images:
-                    result["slide_image_url"] = images[0]
+            for t in items:
+                tid = t.get("id")
+                if not tid:
+                    continue
+                detail = httpx.get(f"{backend}/api/v1/ppt/template/{tid}",
+                                    headers=headers, timeout=10).json()
+                img = detail.get("thumbnail", "")
+                if img and img.endswith(".png"):
+                    result["slide_image_url"] = img
+                    break
     except Exception as e:
         log(f"Prepop: failed to get slide image: {e}")
+
+    if not result.get("slide_image_url"):
+        try:
+            out = subprocess.run(
+                ["docker", "exec", "presenton-app",
+                 "find", "/app_data/templates", "-name", "image*.png", "-type", "f"],
+                capture_output=True, text=True, timeout=10)
+            if out.returncode == 0:
+                images = [l.strip() for l in out.stdout.strip().split("\n") if l.strip()]
+                if images:
+                    result["slide_image_url"] = images[0]
+        except Exception as e:
+            log(f"Prepop: fallback image scan failed: {e}")
 
     log(f"Prepop result: {json.dumps({k: v if len(str(v)) < 80 else str(v)[:80] + '...' for k, v in result.items()})}")
     return result
@@ -460,21 +491,27 @@ async def main():
             log("\n=== Phase 4: Presentation LLM Tools ===")
             await run_test_with_store(
                 session, "18 generate_presentation_async", "generate_presentation_async",
-                {"id": presentation_id} if presentation_id else {"id": FAKE_ID},
+                {"content": "A short presentation about AI trends in 2026", "n_slides": 3},
                 store_key="generate_presentation_async",
+                timeout=LLM_TEST_TIMEOUT,
             )
             await run_test(
                 session, "19 edit_presentation", "edit_presentation",
-                {"id": presentation_id, "prompt": "improve the content and add more detail"} if presentation_id
-                else {"id": FAKE_ID, "prompt": "improve"},
+                {"presentation_id": presentation_id, "slides": [{"index": 0, "content": {"title": "Updated Title"}}]} if presentation_id
+                else {"presentation_id": FAKE_ID, "slides": [{"index": 0, "content": {"title": "Test"}}]},
             )
             await run_test_with_store(
                 session, "20 derive_presentation", "derive_presentation",
-                {"id": presentation_id, "prompt": "derive a new version about AI trends"} if presentation_id
-                else {"id": FAKE_ID, "prompt": "derive"},
+                {"presentation_id": presentation_id, "slides": [{"index": 0, "content": {"title": "Derived Presentation"}}]} if presentation_id
+                else {"presentation_id": FAKE_ID, "slides": [{"index": 0, "content": {"title": "Derived"}}]},
                 store_key="derive_presentation",
+                timeout=LLM_TEST_TIMEOUT,
             )
             derived_id = pick_id("derive_presentation")
+            if not derived_id:
+                dp = store.get("derive_presentation", {})
+                if isinstance(dp, dict):
+                    derived_id = dp.get("presentation_id") or dp.get("_id")
             await run_test(
                 session, "21 delete_derived_presentation", "delete_presentation_by_id",
                 {"id": derived_id} if derived_id else {"id": FAKE_ID},
@@ -515,7 +552,7 @@ async def main():
         if RUN_LLM:
             await run_test(
                 session, "28 generate_theme", "generate_theme",
-                {"prompt": "modern corporate blue with clean typography"},
+                {"primary": "#2563EB", "background": "#F8FAFC", "accent_1": "#10B981"},
             )
 
         # ------------------------------------------------------------------
@@ -556,10 +593,12 @@ async def main():
                 session, "33 create_template_layouts", "create_template_layouts",
                 {"template_id": custom_template_id, "index": 0} if custom_template_id
                 else {"template_id": FAKE_ID, "index": 0},
+                timeout=LLM_TEST_TIMEOUT,
             )
             await run_test(
                 session, "34 generate_template_blocks", "generate_template_blocks",
                 {"template_id": custom_template_id} if custom_template_id else {"template_id": FAKE_ID},
+                timeout=LLM_TEST_TIMEOUT,
             )
         await run_test_with_store(
             session, "35 get_template_by_id_full", "get_template_by_id",
@@ -592,6 +631,7 @@ async def main():
                                                 "max_length": 100,
                                                 "min_length": 1
                                             }]}]}},
+                timeout=LLM_TEST_TIMEOUT,
             )
         await run_test(
             session, "37 update_template", "update_template",
@@ -606,7 +646,7 @@ async def main():
         await run_test(session, "38 list_generated_images_full", "list_generated_images", {"include_all_fields": True})
         await run_test(session, "39 list_uploaded_images_full", "list_uploaded_images", {"include_all_fields": True})
         if RUN_LLM:
-            await run_test(session, "40 generate_image", "generate_image", {"prompt": "a cute cat"})
+            await run_test(session, "40 generate_image", "generate_image", {"prompt": "a cute cat"}, timeout=LLM_TEST_TIMEOUT)
 
         # ------------------------------------------------------------------
         # Phase 9: Font & File Tools
@@ -614,8 +654,6 @@ async def main():
         log("\n=== Phase 9: Font & File Tools ===")
         await run_test(session, "41 list_all_fonts_full", "list_all_fonts", {"include_all_fields": True})
         await run_test(session, "42 list_uploaded_fonts_full", "list_uploaded_fonts", {"include_all_fields": True})
-        if RUN_LLM:
-            await run_test(session, "43 delete_font_by_filename", "delete_font_by_filename", {"filename": "nonexistent.ttf"})
         await run_test(
             session, "44 decompose_file", "decompose_file",
             {"file_paths": ["/tmp/presenton/test_decompose.txt"], "language": "en"},
@@ -629,12 +667,12 @@ async def main():
             await run_test_with_store(
                 session, "45 prepare_presentation", "prepare_presentation",
                 {"id": presentation_id,
-                 "outlines": json.dumps([{"title": "Slide 1", "content": ["Content 1"]}]),
-                 "layout": json.dumps({"name": "default",
-                                       "slides": [{"id": "s1", "json_schema": {}}]})}
+                 "outlines": json.dumps([{"content": "Introduction to AI trends"}]),
+                 "layout": "standard"}
                 if presentation_id
-                else {"id": FAKE_ID, "outlines": "[]", "layout": "{}"},
+                else {"id": FAKE_ID, "outlines": "[]", "layout": "standard"},
                 store_key="prepare_presentation",
+                timeout=LLM_TEST_TIMEOUT,
             )
             outline_data = store.get("prepare_presentation", {})
             outline_id = None
@@ -653,10 +691,12 @@ async def main():
             await run_test(
                 session, "48 edit_slide", "edit_slide",
                 {"id": FAKE_ID, "prompt": "improve this slide"},
+                timeout=LLM_TEST_TIMEOUT,
             )
             await run_test(
                 session, "49 edit_slide_html", "edit_slide_html",
                 {"id": FAKE_ID, "prompt": "make it beautiful", "html": "<p>hello</p>"},
+                timeout=LLM_TEST_TIMEOUT,
             )
 
         # ------------------------------------------------------------------
@@ -673,6 +713,7 @@ async def main():
                 {"presentation_id": presentation_id, "message": "Hello, what is this presentation about?"} if presentation_id
                 else {"presentation_id": FAKE_ID, "message": "hello"},
                 store_key="send_chat_message",
+                timeout=LLM_TEST_TIMEOUT,
             )
             chat_data = store.get("send_chat_message", {})
             conv_id = chat_data.get("conversation_id") if isinstance(chat_data, dict) else None

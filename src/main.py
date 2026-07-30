@@ -77,12 +77,21 @@ class UpdatePresentationParam(BaseModel):
 
 
 class GeneratePresentationAsyncParam(BaseModel):
-    id: str
+    content: str
+    n_slides: Optional[int] = None
+    instructions: Optional[str] = None
+    tone: str = "default"
+    verbosity: str = "standard"
+    language: Optional[str] = None
+    template: str = "general"
+    include_table_of_contents: bool = False
+    include_title_slide: bool = True
 
 
 class EditPresentationParam(BaseModel):
-    id: str
-    prompt: str
+    presentation_id: str
+    slides: list[dict[str, Any]]
+    export_as: str = "pptx"
 
 
 class CreateThemeParam(BaseModel):
@@ -100,7 +109,12 @@ class UpdateThemeParam(BaseModel):
 
 
 class GenerateThemeParam(BaseModel):
-    prompt: str
+    primary: Optional[str] = None
+    background: Optional[str] = None
+    accent_1: Optional[str] = None
+    accent_2: Optional[str] = None
+    text_1: Optional[str] = None
+    text_2: Optional[str] = None
 
 
 class UpdateOutlineParam(BaseModel):
@@ -127,6 +141,7 @@ class ChatMessageParam(BaseModel):
     presentation_id: str
     message: str
     conversation_id: str = ""
+    attachments: Optional[list[dict[str, Any]]] = None
 
 
 # =============================================================================
@@ -272,15 +287,41 @@ async def duplicate_presentation(
 
 @mcp.tool(tags={"write", "primary", "presenton"})
 async def generate_presentation_async(
-    id: str,
+    content: str,
+    n_slides: Optional[int] = None,
+    instructions: Optional[str] = None,
+    tone: str = "default",
+    verbosity: str = "standard",
+    language: Optional[str] = None,
+    template: str = "general",
+    include_table_of_contents: bool = False,
+    include_title_slide: bool = True,
     ctx: Context = None,
 ) -> dict[str, Any]:
     """Generate slides for a presentation asynchronously.
 
     Args:
-        id: The unique ID of the presentation to generate slides for.
+        content: The content to generate the presentation from.
+        n_slides: Number of slides to generate.
+        instructions: Additional instructions for the AI.
+        tone: The tone of the presentation (default, casual, professional, funny, educational, sales_pitch).
+        verbosity: The verbosity level (concise, standard, text-heavy).
+        language: The language for the presentation.
+        template: The template to use (default: general).
+        include_table_of_contents: Whether to include a table of contents.
+        include_title_slide: Whether to include a title slide.
     """
-    params = GeneratePresentationAsyncParam(id=id)
+    params = GeneratePresentationAsyncParam(
+        content=content,
+        n_slides=n_slides,
+        instructions=instructions,
+        tone=tone,
+        verbosity=verbosity,
+        language=language,
+        template=template,
+        include_table_of_contents=include_table_of_contents,
+        include_title_slide=include_title_slide,
+    )
     return await get_client().generate_presentation_async(
         params.model_dump(exclude_unset=True), get_user_token()
     )
@@ -301,17 +342,23 @@ async def get_presentation_generation_status(
 
 @mcp.tool(tags={"write", "primary", "presenton"})
 async def edit_presentation(
-    id: str,
-    prompt: str,
+    presentation_id: str,
+    slides: list[dict[str, Any]],
+    export_as: str = "pptx",
     ctx: Context = None,
 ) -> dict[str, Any]:
-    """Edit an existing presentation's content using an AI prompt.
+    """Edit an existing presentation's slides.
 
     Args:
-        id: The unique ID of the presentation to edit.
-        prompt: Instructions for the AI on how to edit the presentation.
+        presentation_id: The unique ID of the presentation to edit.
+        slides: List of slide content updates, each with index and content dict.
+        export_as: Export format (pptx or pdf, default: pptx).
     """
-    params = EditPresentationParam(id=id, prompt=prompt)
+    params = EditPresentationParam(
+        presentation_id=presentation_id,
+        slides=slides,
+        export_as=export_as,
+    )
     return await get_client().edit_presentation(
         params.model_dump(exclude_unset=True), get_user_token()
     )
@@ -319,17 +366,23 @@ async def edit_presentation(
 
 @mcp.tool(tags={"write", "advanced", "presenton"})
 async def derive_presentation(
-    id: str,
-    prompt: str,
+    presentation_id: str,
+    slides: list[dict[str, Any]],
+    export_as: str = "pptx",
     ctx: Context = None,
 ) -> dict[str, Any]:
-    """Derive a new presentation from an existing one using an AI prompt.
+    """Derive a new presentation from an existing one.
 
     Args:
-        id: The unique ID of the source presentation.
-        prompt: Instructions for the AI on how to derive the new presentation.
+        presentation_id: The unique ID of the source presentation.
+        slides: List of slide content updates, each with index and content dict.
+        export_as: Export format (pptx or pdf, default: pptx).
     """
-    params = EditPresentationParam(id=id, prompt=prompt)
+    params = EditPresentationParam(
+        presentation_id=presentation_id,
+        slides=slides,
+        export_as=export_as,
+    )
     return await get_client().derive_presentation(
         params.model_dump(exclude_unset=True), get_user_token()
     )
@@ -346,12 +399,11 @@ async def prepare_presentation(
 
     Args:
         id: The unique ID of the presentation to prepare.
-        outlines: JSON string of outlines array.
-        layout: JSON string of layout object.
+        outlines: JSON string of outlines array (each with content field).
+        layout: The layout template name (e.g. "standard", "momentum", "swift").
     """
     outlines_list = json.loads(outlines)
-    layout_obj = json.loads(layout)
-    payload = {"presentation_id": id, "outlines": outlines_list, "layout": layout_obj}
+    payload = {"presentation_id": id, "outlines": outlines_list, "layout": layout}
     return await get_client().prepare_presentation(payload, get_user_token())
 
 
@@ -496,18 +548,26 @@ async def generate_template_blocks(
 @mcp.tool(tags={"write", "primary", "presenton"})
 async def update_template_layouts(
     template_id: str,
-    index: int,
-    layout: dict[str, Any],
+    index: Optional[int] = None,
+    layout: Optional[dict[str, Any]] = None,
+    layouts: Optional[list[dict[str, Any]]] = None,
     ctx: Context = None,
 ) -> dict[str, Any]:
-    """Update a single slide layout within a template.
+    """Update slide layouts within a template.
 
     Args:
         template_id: The unique ID of the template.
-        index: Slide index to update.
-        layout: The layout object to set for the slide.
+        index: Slide index to update (used with single layout).
+        layout: The layout object to set for a single slide (used with index).
+        layouts: Batch list of {index, layout} pairs for updating multiple slides at once.
     """
-    payload = {"index": index, "layout": layout}
+    payload: dict[str, Any] = {}
+    if index is not None:
+        payload["index"] = index
+    if layout is not None:
+        payload["layout"] = layout
+    if layouts is not None:
+        payload["layouts"] = layouts
     return await get_client().update_template_layouts(template_id, payload, get_user_token())
 
 
@@ -653,15 +713,32 @@ async def delete_theme_by_id(
 
 @mcp.tool(tags={"write", "primary", "presenton"})
 async def generate_theme(
-    prompt: str,
+    primary: Optional[str] = None,
+    background: Optional[str] = None,
+    accent_1: Optional[str] = None,
+    accent_2: Optional[str] = None,
+    text_1: Optional[str] = None,
+    text_2: Optional[str] = None,
     ctx: Context = None,
 ) -> dict[str, Any]:
-    """Generate a color palette and theme data from a prompt.
+    """Generate a color palette and theme data from optional color hints.
 
     Args:
-        prompt: A description of the desired theme colors and style.
+        primary: Primary color hex value (e.g. #2563EB).
+        background: Background color hex value.
+        accent_1: First accent color hex value.
+        accent_2: Second accent color hex value.
+        text_1: Primary text color hex value.
+        text_2: Secondary text color hex value.
     """
-    params = GenerateThemeParam(prompt=prompt)
+    params = GenerateThemeParam(
+        primary=primary,
+        background=background,
+        accent_1=accent_1,
+        accent_2=accent_2,
+        text_1=text_1,
+        text_2=text_2,
+    )
     return await get_client().generate_theme(
         params.model_dump(exclude_unset=True), get_user_token()
     )
@@ -791,20 +868,6 @@ async def list_uploaded_fonts(
         include_all_fields=include_all_fields if ALLOW_ALL_AGGREGATE else False,
     )
     return {"items": json_to_toon(data)}
-
-
-@mcp.tool(tags={"write", "basic", "presenton"})
-async def delete_font_by_filename(
-    filename: str,
-    ctx: Context = None,
-) -> dict[str, Any]:
-    """Delete a font file by its filename.
-
-    Args:
-        filename: The filename of the font to delete.
-    """
-    await get_client().delete_font_by_filename(filename, get_user_token())
-    return {"deleted": True, "filename": filename}
 
 
 @mcp.tool(tags={"write", "primary", "presenton"})
@@ -973,6 +1036,7 @@ async def send_chat_message(
     presentation_id: str,
     message: str,
     conversation_id: str = "",
+    attachments: Optional[list[dict[str, Any]]] = None,
     ctx: Context = None,
 ) -> dict[str, Any]:
     """Send a chat message for a presentation.
@@ -981,11 +1045,13 @@ async def send_chat_message(
         presentation_id: The unique ID of the presentation.
         message: The message content to send.
         conversation_id: The conversation ID to continue. Empty starts a new conversation.
+        attachments: Optional list of file attachments, each with name and file_path.
     """
     params = ChatMessageParam(
         presentation_id=presentation_id,
         message=message,
         conversation_id=conversation_id,
+        attachments=attachments,
     )
     return await get_client().send_chat_message(
         params.model_dump(exclude_unset=True), get_user_token()
