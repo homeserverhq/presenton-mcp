@@ -503,15 +503,16 @@ async def main():
                 {"content": make_name("AI presentation"), "n_slides": 3},
                 store_key="create_presentation",
             )
+            create_entry = store.get("create_presentation", {})
+            if isinstance(create_entry, dict):
+                init_data = create_entry.get("data", {})
+                if isinstance(init_data, dict):
+                    pid = init_data.get("presentation_id")
+                    if pid:
+                        created["llm_presentation"] = pid
             create_task_id = pick_id("create_presentation")
             if create_task_id:
                 task_result = await poll_async_task(session, "18b poll_create_presentation", create_task_id, timeout=LLM_TEST_TIMEOUT)
-                if task_result:
-                    task_data = task_result.get("data") or {}
-                    pid = task_data.get("presentation_id") if isinstance(task_data, dict) else None
-                    if pid:
-                        created["llm_presentation"] = pid
-                        presentation_id = pid
             await run_test(
                 session, "19 edit_presentation", "edit_presentation",
                 {"presentation_id": presentation_id, "slides": [{"index": 0, "content": {"title": "Updated Title"}}]} if presentation_id
