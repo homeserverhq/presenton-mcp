@@ -206,7 +206,10 @@ def leak_items(data: Any, prefix: str) -> list[tuple[Any, str]]:
 async def _run_leak_detection(session: MCPSession) -> None:
     leak_scan_config = [
         ("list_all_presentations", "delete_presentation_by_id", "id"),
+        ("list_all_templates", "delete_template_by_id", "id"),
+        ("list_all_themes", "delete_theme_by_id", "id"),
     ]
+    known_created_ids = {v for v in created.values() if v}
     total_leaks = 0
     for list_tool, delete_tool, id_field in leak_scan_config:
         result = await session.call_tool(list_tool, {})
@@ -216,10 +219,12 @@ async def _run_leak_detection(session: MCPSession) -> None:
             if not isinstance(item, dict):
                 continue
             item_name = item.get("name") or item.get("title") or ""
-            if not isinstance(item_name, str) or not item_name.startswith(f"t{rid}-"):
-                continue
             item_id = item.get(id_field)
             if item_id is None:
+                continue
+            name_match = isinstance(item_name, str) and item_name.startswith(f"t{rid}-")
+            id_match = item_id in known_created_ids
+            if not name_match and not id_match:
                 continue
             total_leaks += 1
             label = f"LEAK {list_tool} id={item_id}"
@@ -248,7 +253,7 @@ async def poll_async_task(
     label: str,
     task_id: str,
     timeout: int = 120,
-) -> bool:
+) -> Optional[dict]:
     deadline = time.time() + timeout
     while time.time() < deadline:
         result = await session.call_tool("get_async_task_status", {"id": task_id})
@@ -259,7 +264,7 @@ async def poll_async_task(
                 "reason": err,
             })
             log(f"  FAIL {label}: {err}")
-            return False
+            return None
         data = extract_content(result)
         if isinstance(data, dict):
             status = data.get("status", "")
@@ -269,7 +274,7 @@ async def poll_async_task(
                     "data": data,
                 })
                 log(f"  PASS {label}")
-                return True
+                return data
             if status == "failed":
                 msg = data.get("message", "Task failed")
                 results.append({
@@ -277,14 +282,14 @@ async def poll_async_task(
                     "reason": msg,
                 })
                 log(f"  FAIL {label}: {msg}")
-                return False
+                return None
         await asyncio.sleep(POLL_INTERVAL)
     results.append({
         "label": label, "tool": "get_async_task_status", "status": "FAILED",
         "reason": f"Timed out after {timeout}s",
     })
     log(f"  FAIL {label}: Timed out after {timeout}s")
-    return False
+    return None
 
 
 async def run_test(
@@ -436,6 +441,10 @@ async def main():
 
         presentation_id = pick_id("create_presentation")
         theme_id = pick_id("create_theme")
+        if presentation_id:
+            created["presentation"] = presentation_id
+        if theme_id:
+            created["theme"] = theme_id
 
         # ------------------------------------------------------------------
         # Phase 2: List / Read Tools
@@ -472,6 +481,8 @@ async def main():
             store_key="duplicate_presentation",
         )
         dupe_id = pick_id("duplicate_presentation")
+        if dupe_id:
+            created["duplicate"] = dupe_id
         await run_test(
             session, "17 delete_presentation_by_id", "delete_presentation_by_id",
             {"id": dupe_id} if dupe_id else {"id": FAKE_ID},
@@ -505,6 +516,8 @@ async def main():
                 dp = store.get("derive_presentation", {})
                 if isinstance(dp, dict):
                     derived_id = dp.get("presentation_id") or dp.get("_id")
+            if derived_id:
+                created["derive"] = derived_id
             await run_test(
                 session, "21 delete_derived_presentation", "delete_presentation_by_id",
                 {"id": derived_id} if derived_id else {"id": FAKE_ID},
@@ -524,6 +537,18 @@ async def main():
                 session, "23 get_async_task_status", "get_async_task_status",
                 {"id": task_id} if task_id else {"id": FAKE_ID},
             )
+            if task_id:
+                task_result = await poll_async_task(session, "23a poll_gen_presentation", task_id, timeout=LLM_TEST_TIMEOUT)
+                if task_result:
+                    known_pres = {created.get(k) for k in ("presentation", "duplicate", "derive") if created.get(k)}
+                    list_result = await session.call_tool("list_all_presentations", {"include_all_fields": True})
+                    list_data = extract_content(list_result)
+                    for item in get_list_items(list_data):
+                        if isinstance(item, dict):
+                            pid = item.get("id")
+                            if pid and pid not in known_pres:
+                                created["generated_presentation"] = pid
+                                break
 
         # ------------------------------------------------------------------
         # Phase 6: Theme Tools
@@ -573,9 +598,19 @@ async def main():
             store_key="create_template_async",
         )
         async_data = store.get("create_template_async", {})
-        async_task_id = async_data.get("task_id") if isinstance(async_data, dict) else None
+        async_task_id = async_data.get("id") if isinstance(async_data, dict) else None
         if async_task_id:
-            await poll_async_task(session, "31a verify template_task", async_task_id)
+            task_result = await poll_async_task(session, "31a verify template_task", async_task_id)
+            if task_result:
+                tmpl_name = make_name("async-template")
+                list_result = await session.call_tool("list_all_templates", {})
+                list_data = extract_content(list_result)
+                for item in get_list_items(list_data):
+                    if isinstance(item, dict) and item.get("name") == tmpl_name:
+                        tid = item.get("id")
+                        if tid:
+                            created["async_template"] = tid
+                            break
         await run_test_with_store(
             session, "32 create_template_init", "create_template_init",
             {
@@ -587,6 +622,8 @@ async def main():
             store_key="custom_template",
         )
         custom_template_id = pick_id("custom_template")
+        if custom_template_id:
+            created["custom_template"] = custom_template_id
         if RUN_LLM:
             await run_test(
                 session, "33 create_template_layouts", "create_template_layouts",
@@ -793,6 +830,18 @@ async def main():
             session, "55 verify_presentation_deleted", "get_presentation_by_id",
             {"id": presentation_id} if presentation_id else {"id": FAKE_ID},
         )
+        async_tmpl_id = created.get("async_template")
+        if async_tmpl_id:
+            await run_test(
+                session, "56 delete_async_template", "delete_template_by_id",
+                {"id": async_tmpl_id},
+            )
+        gen_pres_id = created.get("generated_presentation")
+        if gen_pres_id:
+            await run_test(
+                session, "57 delete_gen_presentation", "delete_presentation_by_id",
+                {"id": gen_pres_id},
+            )
 
         # ------------------------------------------------------------------
         # Phase 13: Leak Detection
