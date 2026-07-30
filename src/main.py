@@ -93,7 +93,7 @@ class ThemeFontRef(BaseModel):
 
 
 class ThemeFontConfig(BaseModel):
-    textFont: Optional[ThemeFontRef] = Field(default=None, description="Text font configuration")
+    textFont: Optional[ThemeFontRef] = Field(default=None, description="Font configuration")
 
 
 class ThemeData(BaseModel):
@@ -105,7 +105,7 @@ class ThemeData(BaseModel):
 
 
 class ChatAttachmentItem(BaseModel):
-    type: str = Field(default="document", description="Attachment type (e.g. 'document')")
+    type: str = Field(default="document", description="Attachment type (e.g. 'document') (Default: document)")
     name: str = Field(description="File name (e.g. 'report.pptx')")
     file_path: str = Field(description="Server path (e.g. '/tmp/uploads/report.pptx')")
     mime_type: Optional[str] = Field(default=None, description="MIME type (e.g. 'application/pdf')")
@@ -128,12 +128,12 @@ class TextRun(BaseModel):
 
 
 class BaseElement(BaseModel):
-    position: Optional[Position] = Field(default=None, description="Element position")
-    size: Optional[Size] = Field(default=None, description="Element size")
+    position: Optional[Position] = Field(default=None, description="Position")
+    size: Optional[Size] = Field(default=None, description="Size")
 
 
 class TextElement(BaseElement):
-    type: str = Field(default="text", description="Element type (e.g. 'text')")
+    type: str = Field(default="text", description="Element type (e.g. 'text') (Default: text)")
     runs: list[TextRun] = Field(description="Text runs (e.g. [{'text': 'Hello'}])")
     decorative: bool = Field(default=False, description="Decorative element: true or false")
     name: Optional[str] = Field(default=None, description="Element name (e.g. 'r1')")
@@ -142,15 +142,15 @@ class TextElement(BaseElement):
 
 
 class ImageElement(BaseElement):
-    type: str = Field(default="image", description="Element type (e.g. 'image')")
-    data: str = Field(default="", description="Image data URL")
+    type: str = Field(default="image", description="Element type (e.g. 'image') (Default: image)")
+    data: str = Field(default="", description="Image data URL (e.g. '/static/images/photo.png')")
     decorative: bool = Field(default=False, description="Decorative element: true or false")
     name: Optional[str] = Field(default=None, description="Element name (e.g. 'img1')")
     is_icon: bool = Field(default=False, description="Icon element: true or false")
 
 
 class TextListElement(BaseElement):
-    type: str = Field(default="text-list", description="Element type (e.g. 'text-list')")
+    type: str = Field(default="text-list", description="Element type (e.g. 'text-list') (Default: text-list)")
     items: list[list[TextRun]] = Field(description="List items (e.g. [[{'text': 'Item 1'}], [{'text': 'Item 2'}]])")
     decorative: bool = Field(default=False, description="Decorative element: true or false")
     name: Optional[str] = Field(default=None, description="Element name (e.g. 'bullets')")
@@ -164,23 +164,23 @@ SlideElement = Union[TextElement, ImageElement, TextListElement]
 class LayoutComponent(BaseModel):
     id: str = Field(description="Component ID (e.g. 'c1')")
     description: str = Field(description="Component description (e.g. 'test component...')")
-    position: Position = Field(description="Component position")
-    size: Optional[Size] = Field(default=None, description="Component size")
+    position: Position = Field(description="Position")
+    size: Optional[Size] = Field(default=None, description="Size")
     elements: list[SlideElement] = Field(description="Component elements (e.g. [{'type': 'text', 'runs': [{'text': 'hello'}]}])")
 
 
 class LayoutObject(BaseModel):
     id: str = Field(description="Layout ID (e.g. 'test-layout')")
     description: str = Field(description="Layout description (min 10 chars, e.g. 'test layout description...')")
-    components: list[LayoutComponent] = Field(description="Layout components")
+    components: list[LayoutComponent] = Field(description="Components")
 
 
 class CreatePresentationParam(BaseModel):
     content: str = Field(description="Markdown content (e.g. '# My Talk\\n\\nIntroduction...')")
     n_slides: Optional[int] = Field(default=None, description="Number of slides (e.g. 10)")
     language: str = Field(default="", description="Language code (e.g. 'en')")
-    tone: str = Field(default="default", description="Presentation tone (e.g. 'professional')")
-    verbosity: str = Field(default="standard", description="Content verbosity (e.g. 'standard')")
+    tone: str = Field(default="default", description="Presentation tone. One of: default, professional, casual, enthusiastic, informative, humorous, inspiring, persuasive, formal, friendly, creative, witty, educational, motivational, or storytelling (Default: default)")
+    verbosity: str = Field(default="standard", description="Content verbosity. One of: standard, concise, detailed, comprehensive, or brief (Default: standard)")
     instructions: str = Field(default="", description="Additional AI instructions (e.g. 'Use simple language')")
     include_table_of_contents: bool = Field(default=False, description="Include table of contents: true or false")
     include_title_slide: bool = Field(default=True, description="Include title slide: true or false")
@@ -192,8 +192,8 @@ class UpdatePresentationParam(BaseModel):
     content: Optional[str] = Field(default=None, description="Updated markdown content (e.g. '# Updated Content')")
     n_slides: Optional[int] = Field(default=None, description="Updated number of slides (e.g. 10)")
     language: Optional[str] = Field(default=None, description="Updated language code (e.g. 'en')")
-    tone: Optional[str] = Field(default=None, description="Updated tone (e.g. 'professional')")
-    verbosity: Optional[str] = Field(default=None, description="Updated verbosity (e.g. 'standard')")
+    tone: Optional[str] = Field(default=None, description="Updated tone. One of: default, professional, casual, enthusiastic, informative, humorous, inspiring, persuasive, formal, friendly, creative, witty, educational, motivational, or storytelling")
+    verbosity: Optional[str] = Field(default=None, description="Updated verbosity. One of: standard, concise, detailed, comprehensive, or brief")
     instructions: Optional[str] = Field(default=None, description="Updated AI instructions (e.g. 'Add charts')")
     include_table_of_contents: Optional[bool] = Field(default=None, description="Updated table of contents: true or false")
     include_title_slide: Optional[bool] = Field(default=None, description="Updated title slide: true or false")
@@ -204,10 +204,10 @@ class GeneratePresentationAsyncParam(BaseModel):
     content: str = Field(description="Content to generate slides from (e.g. '# AI Trends\\n\\nOverview...')")
     n_slides: Optional[int] = Field(default=None, description="Number of slides (e.g. 10)")
     instructions: Optional[str] = Field(default=None, description="Additional AI instructions (e.g. 'Focus on benefits')")
-    tone: str = Field(default="default", description="Presentation tone (e.g. 'professional')")
-    verbosity: str = Field(default="standard", description="Content verbosity (e.g. 'standard')")
+    tone: str = Field(default="default", description="Presentation tone. One of: default, casual, professional, funny, educational, or sales_pitch (Default: default)")
+    verbosity: str = Field(default="standard", description="Content verbosity. One of: concise, standard, or text-heavy (Default: standard)")
     language: Optional[str] = Field(default=None, description="Language code (e.g. 'en')")
-    template: str = Field(default="general", description="Template name (e.g. 'general')")
+    template: str = Field(default="general", description="Template name (e.g. 'general') (Default: general)")
     include_table_of_contents: bool = Field(default=False, description="Include table of contents: true or false")
     include_title_slide: bool = Field(default=True, description="Include title slide: true or false")
 
@@ -215,7 +215,7 @@ class GeneratePresentationAsyncParam(BaseModel):
 class EditPresentationParam(BaseModel):
     presentation_id: str = Field(description="Presentation ID (e.g. 'a1b2c3d4-...')")
     slides: list[SlideContentUpdateItem] = Field(description="Slide content updates")
-    export_as: str = Field(default="pptx", description="Export format (e.g. 'pptx' or 'pdf')")
+    export_as: str = Field(default="pptx", description="Export format (e.g. 'pptx' or 'pdf') (Default: pptx)")
 
 
 class CreateThemeParam(BaseModel):
@@ -295,7 +295,7 @@ async def get_presentation_by_id(
     """Get a single presentation by its ID.
 
     Args:
-        id: The unique ID of the presentation.
+        id: The unique ID of the presentation (e.g. 'a1b2c3d4-...').
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_presentation_by_id(id, get_user_token(), include_all_fields=include_all_fields)
@@ -317,12 +317,12 @@ async def create_presentation(
     """Create a new presentation from markdown content.
 
     Args:
-        content: Markdown content of the presentation.
-        n_slides: Number of slides to generate. 0 for auto.
-        language: Language code for the presentation content.
-        tone: Presentation tone. One of: default, professional, casual, enthusiastic, informative, humorous, inspiring, persuasive, formal, friendly, creative, witty, educational, motivational, storytelling.
-        verbosity: Content verbosity. One of: standard, concise, detailed, comprehensive, brief.
-        instructions: Additional instructions for the AI generator.
+        content: Markdown content of the presentation (e.g. '# My Talk\\n\\nIntroduction...').
+        n_slides: Number of slides to generate. 0 for auto (e.g. 10).
+        language: Language code for the presentation content (e.g. 'en').
+        tone: Presentation tone. One of: default, professional, casual, enthusiastic, informative, humorous, inspiring, persuasive, formal, friendly, creative, witty, educational, motivational, or storytelling (Default: default).
+        verbosity: Content verbosity. One of: standard, concise, detailed, comprehensive, or brief (Default: standard).
+        instructions: Additional instructions for the AI generator (e.g. 'Use simple language').
         include_table_of_contents: Include a table of contents slide: true or false.
         include_title_slide: Include a title slide: true or false.
         web_search: Enable web search for content enrichment: true or false.
@@ -355,13 +355,13 @@ async def update_presentation(
     """Update an existing presentation.
 
     Args:
-        id: The unique ID of the presentation to update.
-        content: Updated markdown content.
-        n_slides: Updated number of slides.
-        language: Updated language code.
-        tone: Updated presentation tone.
-        verbosity: Updated content verbosity.
-        instructions: Updated AI instructions.
+        id: The unique ID of the presentation to update (e.g. 'a1b2c3d4-...').
+        content: Updated markdown content (e.g. '# Updated Content').
+        n_slides: Updated number of slides (e.g. 10).
+        language: Updated language code (e.g. 'en').
+        tone: Updated presentation tone. One of: default, professional, casual, enthusiastic, informative, humorous, inspiring, persuasive, formal, friendly, creative, witty, educational, motivational, or storytelling.
+        verbosity: Updated content verbosity. One of: standard, concise, detailed, comprehensive, or brief.
+        instructions: Updated AI instructions (e.g. 'Add charts').
         include_table_of_contents: Include table of contents: true or false.
         include_title_slide: Include title slide: true or false.
         web_search: Enable web search: true or false.
@@ -386,7 +386,7 @@ async def delete_presentation_by_id(
     """Delete a presentation by its ID.
 
     Args:
-        id: The unique ID of the presentation to delete.
+        id: The unique ID of the presentation to delete (e.g. 'a1b2c3d4-...').
     """
     await get_client().delete_presentation_by_id(id, get_user_token())
     return {"deleted": True, "id": id}
@@ -400,7 +400,7 @@ async def duplicate_presentation(
     """Duplicate an existing presentation.
 
     Args:
-        id: The unique ID of the presentation to duplicate.
+        id: The unique ID of the presentation to duplicate (e.g. 'a1b2c3d4-...').
     """
     return await get_client().duplicate_presentation(id, get_user_token())
 
@@ -421,13 +421,13 @@ async def generate_presentation_async(
     """Generate slides for a presentation asynchronously.
 
     Args:
-        content: The content to generate the presentation from.
-        n_slides: Number of slides to generate.
-        instructions: Additional instructions for the AI.
-        tone: The tone of the presentation (default, casual, professional, funny, educational, sales_pitch).
-        verbosity: The verbosity level (concise, standard, text-heavy).
-        language: The language for the presentation.
-        template: The template to use (default: general).
+        content: The content to generate the presentation from (e.g. '# AI Trends\\n\\nOverview...').
+        n_slides: Number of slides to generate (e.g. 10).
+        instructions: Additional instructions for the AI (e.g. 'Focus on benefits').
+        tone: The tone of the presentation. One of: default, casual, professional, funny, educational, or sales_pitch (Default: default).
+        verbosity: The verbosity level. One of: concise, standard, or text-heavy (Default: standard).
+        language: The language for the presentation (e.g. 'en').
+        template: The template to use (Default: general) (e.g. 'general').
         include_table_of_contents: Whether to include a table of contents.
         include_title_slide: Whether to include a title slide.
     """
@@ -455,7 +455,7 @@ async def get_presentation_generation_status(
     """Check the async generation status of a presentation.
 
     Args:
-        id: The task ID returned from generate_presentation_async.
+        id: The task ID returned from generate_presentation_async (e.g. 'a1b2c3d4-...').
     """
     return await get_client().get_presentation_generation_status(id, get_user_token())
 
@@ -471,7 +471,7 @@ async def edit_presentation(
 
     Args:
         presentation_id: Presentation ID (e.g. 'a1b2c3d4-...').
-        slides: Slide content updates.
+        slides: Slide content updates (e.g. [{'index': 0, 'content': {'hero': {'title': 'New'}}}]).
         export_as: Export format (e.g. 'pptx' or 'pdf').
     """
     params = EditPresentationParam(
@@ -495,7 +495,7 @@ async def derive_presentation(
 
     Args:
         presentation_id: Source presentation ID (e.g. 'a1b2c3d4-...').
-        slides: Slide content updates.
+        slides: Slide content updates (e.g. [{'index': 0, 'content': {'hero': {'title': 'New'}}}]).
         export_as: Export format (e.g. 'pptx' or 'pdf').
     """
     params = EditPresentationParam(
@@ -543,7 +543,7 @@ async def list_all_templates(
 
     Args:
         include_all_fields: Default False (common fields only). Set True for all fields.
-        page: Page number (1-indexed).
+        page: Page number (1-indexed) (Default: 1).
         page_size: Items per page (1-100).
     """
     data = await get_client().get_all_templates(
@@ -565,7 +565,7 @@ async def get_template_by_id(
     """Get a single template by its ID.
 
     Args:
-        id: The unique ID of the template.
+        id: The unique ID of the template (e.g. 'a1b2c3d4-...').
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_template_by_id(id, get_user_token(), include_all_fields=include_all_fields)
@@ -584,10 +584,10 @@ async def create_template_async(
 
     Args:
         pptx_url: URL path to the PPTX file (e.g. '/app_data/exports/template.pptx').
-        slide_image_urls: Slide preview image URLs, one per slide.
-        fonts: Font entries mapping font names to URLs.
-        name: Template name.
-        description: Template description.
+        slide_image_urls: Slide preview image URLs, one per slide (e.g. ['/images/slide1.png']).
+        fonts: Font entries mapping font names to URLs (e.g. [FontEntry(name='Inter', url='https://...')]).
+        name: Template name (e.g. 'My Template').
+        description: Template description (e.g. 'Professional template for reports').
     """
     payload = {
         "pptx_url": pptx_url,
@@ -613,9 +613,9 @@ async def create_template_init(
 
     Args:
         pptx_url: PPTX file path (e.g. '/app_data/exports/template.pptx').
-        slide_image_urls: Slide preview image URLs, one per slide.
-        name: Template name.
-        description: Template description.
+        slide_image_urls: Slide preview image URLs, one per slide (e.g. ['/images/slide1.png']).
+        name: Template name (e.g. 'My Template').
+        description: Template description (e.g. 'Professional template for reports').
     """
     payload = {
         "pptx_url": pptx_url,
@@ -639,9 +639,9 @@ async def create_template_layouts(
     """Create slide layouts for a template.
 
     Args:
-        template_id: The unique ID of the template.
-        index: A single slide index to create a layout for.
-        indices: Multiple slide indices to create layouts for.
+        template_id: The unique ID of the template (e.g. 'a1b2c3d4-...').
+        index: A single slide index to create a layout for (e.g. 0).
+        indices: Multiple slide indices to create layouts for (e.g. [0, 1, 2]).
     """
     payload = {"template_id": template_id}
     if index is not None:
@@ -659,7 +659,7 @@ async def generate_template_blocks(
     """Generate merged component blocks for a template.
 
     Args:
-        template_id: The unique ID of the template.
+        template_id: The unique ID of the template (e.g. 'a1b2c3d4-...').
     """
     payload = {"template_id": template_id}
     return await get_client().generate_template_blocks(payload, get_user_token())
@@ -678,8 +678,8 @@ async def update_template_layouts(
     Args:
         template_id: Template ID (e.g. 'a1b2c3d4-...').
         index: Slide index to update (used with single layout) (e.g. 0).
-        layout: Layout object to set for a single slide.
-        layouts: Batch list of layouts for updating multiple slides.
+        layout: Layout object to set for a single slide (e.g. LayoutObject(id='lay1', description='desc', components=[...])).
+        layouts: Batch list of layouts for updating multiple slides (e.g. [LayoutObject(...), LayoutObject(...)]).
     """
     payload: dict[str, Any] = {}
     if index is not None:
@@ -701,9 +701,9 @@ async def update_template(
     """Update a template's metadata.
 
     Args:
-        id: The unique ID of the template to update.
-        name: New template name.
-        description: New template description.
+        id: The unique ID of the template to update (e.g. 'a1b2c3d4-...').
+        name: New template name (e.g. 'Updated Template').
+        description: New template description (e.g. 'Updated description').
     """
     payload = {}
     if name is not None:
@@ -721,7 +721,7 @@ async def delete_template_by_id(
     """Delete a template by its ID.
 
     Args:
-        id: The unique ID of the template to delete.
+        id: The unique ID of the template to delete (e.g. 'a1b2c3d4-...').
     """
     await get_client().delete_template_by_id(id, get_user_token())
     return {"deleted": True, "id": id}
@@ -780,7 +780,7 @@ async def create_theme(
         name: Theme name (e.g. 'Corporate Blue').
         description: Theme description (e.g. 'Professional blue theme').
         company_name: Company name (e.g. 'Acme Corp').
-        data: Theme configuration.
+        data: Theme configuration (e.g. ThemeData(colors={'primary': '#2563EB'})).
     """
     params = CreateThemeParam(
         name=name, description=description,
@@ -804,10 +804,10 @@ async def update_theme(
 
     Args:
         id: Theme ID (e.g. 'a1b2c3d4-...').
-        name: Updated theme name.
-        description: Updated description.
-        company_name: Updated company name.
-        data: Updated theme configuration.
+        name: Updated theme name (e.g. 'Corporate Blue v2').
+        description: Updated description (e.g. 'Updated blue theme').
+        company_name: Updated company name (e.g. 'Acme Corp').
+        data: Updated theme configuration (e.g. ThemeData(name='Corporate Blue')).
     """
     params = UpdateThemeParam(
         name=name, description=description,
@@ -825,7 +825,7 @@ async def delete_theme_by_id(
     """Delete a custom theme by its ID.
 
     Args:
-        id: The unique ID of the theme to delete.
+        id: The unique ID of the theme to delete (e.g. 'a1b2c3d4-...').
     """
     await get_client().delete_theme_by_id(id, get_user_token())
     return {"deleted": True, "id": id}
@@ -845,11 +845,11 @@ async def generate_theme(
 
     Args:
         primary: Primary color hex value (e.g. #2563EB).
-        background: Background color hex value.
-        accent_1: First accent color hex value.
-        accent_2: Second accent color hex value.
-        text_1: Primary text color hex value.
-        text_2: Secondary text color hex value.
+        background: Background color hex value (e.g. #FFFFFF).
+        accent_1: First accent color hex value (e.g. #FF5733).
+        accent_2: Second accent color hex value (e.g. #33FF57).
+        text_1: Primary text color hex value (e.g. #000000).
+        text_2: Secondary text color hex value (e.g. #666666).
     """
     params = GenerateThemeParam(
         primary=primary,
@@ -878,7 +878,7 @@ async def search_stock_images(
     """Search stock images from integrated providers.
 
     Args:
-        query: Search query string.
+        query: Search query string (e.g. 'business meeting').
         limit: Maximum number of results (1-30).
     """
     data = await get_client().search_stock_images(query, get_user_token(), limit=limit)
@@ -896,7 +896,7 @@ async def generate_image(
     """Generate an image using AI based on a text prompt.
 
     Args:
-        prompt: Description of the image to generate.
+        prompt: Description of the image to generate (e.g. 'A beautiful sunset over mountains').
     """
     result = await get_client().generate_image(prompt, get_user_token())
     if isinstance(result, str):
@@ -947,8 +947,8 @@ async def search_icons(
     """Search icons from the Phosphor icon library.
 
     Args:
-        query: Search query string.
-        limit: Maximum number of results.
+        query: Search query string (e.g. 'arrow').
+        limit: Maximum number of results (1-50).
     """
     data = await get_client().search_icons(query, get_user_token(), limit=limit)
     return {"items": json_to_toon(data) if isinstance(data, list) else data}
@@ -1002,8 +1002,8 @@ async def decompose_file(
     """Decompose uploaded files into text for presentation content.
 
     Args:
-        file_paths: List of file paths (strings) to decompose.
-        language: Language code for document processing.
+        file_paths: List of file paths (strings) to decompose (e.g. ['/tmp/report.pptx']).
+        language: Language code for document processing (e.g. 'en').
     """
     params = DecomposeFileParam(file_paths=file_paths, language=language)
     data = await get_client().decompose_file(
@@ -1026,7 +1026,7 @@ async def get_outline_by_id(
     """Get a presentation outline by its ID.
 
     Args:
-        id: The unique ID of the outline.
+        id: The unique ID of the outline (e.g. 'a1b2c3d4-...').
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_outline_by_id(id, get_user_token(), include_all_fields=include_all_fields)
@@ -1042,7 +1042,7 @@ async def update_outline(
 
     Args:
         id: Outline ID (e.g. 'a1b2c3d4-...').
-        slides: Updated slide outline items.
+        slides: Updated slide outline items (e.g. [{'content': '# Intro\\n\\nOverview...'}]).
     """
     payload = {"slides": [s.model_dump() for s in slides]}
     return await get_client().update_outline(id, payload, get_user_token())
@@ -1057,8 +1057,8 @@ async def edit_slide(
     """Edit a slide's content using an AI prompt.
 
     Args:
-        id: The unique ID of the slide to edit.
-        prompt: Instructions for the AI on how to edit the slide.
+        id: The unique ID of the slide to edit (e.g. 'a1b2c3d4-...').
+        prompt: Instructions for the AI on how to edit the slide (e.g. 'Make this slide more concise').
     """
     params = EditSlideParam(id=id, prompt=prompt)
     return await get_client().edit_slide(
@@ -1076,9 +1076,9 @@ async def edit_slide_html(
     """Edit a slide's HTML representation using an AI prompt.
 
     Args:
-        id: The unique ID of the slide to edit.
-        prompt: Instructions for the AI on how to edit the slide HTML.
-        html: The current HTML content of the slide to edit.
+        id: The unique ID of the slide to edit (e.g. 'a1b2c3d4-...').
+        prompt: Instructions for the AI on how to edit the slide HTML (e.g. 'Improve the layout').
+        html: The current HTML content of the slide to edit (e.g. '<p>hello</p>').
     """
     params = EditSlideHtmlParam(id=id, prompt=prompt, html=html)
     return await get_client().edit_slide_html(
@@ -1100,7 +1100,7 @@ async def list_chat_conversations(
     """List chat conversations for a presentation.
 
     Args:
-        presentation_id: The unique ID of the presentation.
+        presentation_id: The unique ID of the presentation (e.g. 'a1b2c3d4-...').
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
     data = await get_client().list_chat_conversations(
@@ -1120,8 +1120,8 @@ async def get_chat_history(
     """Get chat message history for a conversation.
 
     Args:
-        presentation_id: The unique ID of the presentation.
-        conversation_id: The unique ID of the chat conversation.
+        presentation_id: The unique ID of the presentation (e.g. 'a1b2c3d4-...').
+        conversation_id: The unique ID of the chat conversation (e.g. 'a1b2c3d4-...').
         include_all_fields: Default False (common fields only). Set True for all fields.
     """
     return await get_client().get_chat_history(
@@ -1139,8 +1139,8 @@ async def delete_chat_conversation(
     """Delete a chat conversation.
 
     Args:
-        presentation_id: The unique ID of the presentation.
-        conversation_id: The unique ID of the chat conversation to delete.
+        presentation_id: The unique ID of the presentation (e.g. 'a1b2c3d4-...').
+        conversation_id: The unique ID of the chat conversation to delete (e.g. 'a1b2c3d4-...').
     """
     await get_client().delete_chat_conversation(
         presentation_id, conversation_id, get_user_token()
@@ -1161,8 +1161,8 @@ async def send_chat_message(
     Args:
         presentation_id: Presentation ID (e.g. 'a1b2c3d4-...').
         message: Message content (e.g. 'What is this about?').
-        conversation_id: Conversation ID to continue. Empty starts new.
-        attachments: File attachments.
+        conversation_id: Conversation ID to continue. Empty starts new (e.g. 'a1b2c3d4-...').
+        attachments: File attachments (e.g. [ChatAttachmentItem(name='report.pptx', file_path='/tmp/r.pptx')]).
     """
     params = ChatMessageParam(
         presentation_id=presentation_id,
@@ -1200,7 +1200,7 @@ async def get_async_task_status(
     """Get the status of an async task by its ID.
 
     Args:
-        id: The unique ID of the async task.
+        id: The unique ID of the async task (e.g. 'a1b2c3d4-...').
     """
     return await get_client().get_async_task_status(id, get_user_token())
 
