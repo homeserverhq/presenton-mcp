@@ -80,16 +80,15 @@ The MCP server serves at `http://presenton-mcp:80/mcp` (Streamable HTTP).
 
 The server implements 44 MCP tools organized into the following categories:
 
-### 📽️ Presentation Management (11 tools)
+### 📽️ Presentation Management (10 tools)
 
 - `list_all_presentations` — List all presentation records
 - `get_presentation_by_id` — Get a single presentation by ID
-- `create_presentation` — Create a new presentation from markdown content
+- `create_presentation` — Create a presentation with AI-generated slides (async, returns task_id)
+- `bootstrap_presentation` — Create a simple presentation shell without AI processing
 - `update_presentation` — Update an existing presentation
 - `delete_presentation_by_id` — Delete a presentation by ID
 - `duplicate_presentation` — Duplicate an existing presentation
-- `generate_presentation_async` — Generate slides asynchronously
-- `get_presentation_generation_status` — Check async generation status
 - `edit_presentation` — Edit a presentation using an AI prompt
 - `derive_presentation` — Derive a new presentation from an existing one
 - `prepare_presentation` — Prepare a presentation by assigning layouts
@@ -136,7 +135,7 @@ The server implements 44 MCP tools organized into the following categories:
 - `edit_slide` — Edit a slide's content using AI
 - `edit_slide_html` — Edit a slide's HTML using AI
 
-### 💬 Chat & Async Operations (6 tools)
+### 💬 Chat & Async Operations (7 tools)
 
 - `list_chat_conversations` — List chat conversations for a presentation
 - `get_chat_history` — Get chat message history
@@ -144,3 +143,4 @@ The server implements 44 MCP tools organized into the following categories:
 - `send_chat_message` — Send a chat message
 - `list_async_tasks` — List all async task records
 - `get_async_task_status` — Get the status of an async task
+- `get_presentation_generation_status` — Check async generation status by task ID

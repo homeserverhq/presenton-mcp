@@ -500,7 +500,7 @@ async def prepare_presentation(
 
 
 # =============================================================================
-# Template Management Tools (8 tools)
+# Template Management Tools (9 tools)
 # =============================================================================
 
 
@@ -1024,17 +1024,20 @@ async def update_outline(
 
 @mcp.tool(tags={"write", "primary", "presenton"})
 async def edit_slide(
-    id: str,
+    presentation_id: str,
+    index: int,
     prompt: str,
     ctx: Context = None,
 ) -> dict[str, Any]:
     """Edit a slide's content using an AI prompt.
 
     Args:
-        id: The unique ID of the slide to edit (e.g. 'a1b2c3d4-...').
+        presentation_id: The unique ID of the presentation (e.g. 'a1b2c3d4-...').
+        index: The 0-based index of the slide to edit (e.g. 0 for the first slide, 4 for the 5th slide).
         prompt: Instructions for the AI on how to edit the slide (e.g. 'Make this slide more concise').
     """
-    params = EditSlideParam(id=id, prompt=prompt)
+    slide_id = await get_client().resolve_slide_id(presentation_id, index, get_user_token())
+    params = EditSlideParam(id=slide_id, prompt=prompt)
     return await get_client().edit_slide(
         params.model_dump(exclude_unset=True), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE,
@@ -1043,7 +1046,8 @@ async def edit_slide(
 
 @mcp.tool(tags={"write", "advanced", "presenton"})
 async def edit_slide_html(
-    id: str,
+    presentation_id: str,
+    index: int,
     prompt: str,
     html: str = "",
     ctx: Context = None,
@@ -1051,11 +1055,13 @@ async def edit_slide_html(
     """Edit a slide's HTML representation using an AI prompt.
 
     Args:
-        id: The unique ID of the slide to edit (e.g. 'a1b2c3d4-...').
+        presentation_id: The unique ID of the presentation (e.g. 'a1b2c3d4-...').
+        index: The 0-based index of the slide to edit (e.g. 0 for the first slide).
         prompt: Instructions for the AI on how to edit the slide HTML (e.g. 'Improve the layout').
         html: The current HTML content of the slide to edit (e.g. '<p>hello</p>').
     """
-    params = EditSlideHtmlParam(id=id, prompt=prompt, html=html)
+    slide_id = await get_client().resolve_slide_id(presentation_id, index, get_user_token())
+    params = EditSlideHtmlParam(id=slide_id, prompt=prompt, html=html)
     return await get_client().edit_slide_html(
         params.model_dump(exclude_unset=True), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE,

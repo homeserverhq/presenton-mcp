@@ -364,6 +364,19 @@ class PresentonClient:
     # Slides
     # =========================================================================
 
+    async def resolve_slide_id(self, presentation_id: str, index: int, api_key: Optional[str] = None) -> str:
+        data = await self.get(f"/api/v1/ppt/presentation/{presentation_id}", api_key)
+        if data is None:
+            raise Exception("Presentation not found")
+        slides = data.get("slides", [])
+        if index < 0 or index >= len(slides):
+            raise Exception(f"Slide index {index} out of range (presentation has {len(slides)} slides)")
+        slide = slides[index]
+        slide_id = slide.get("id")
+        if not slide_id:
+            raise Exception(f"Slide at index {index} has no id field")
+        return str(slide_id)
+
     async def edit_slide(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.post("/api/v1/ppt/slide/edit", api_key, json=payload)
         if not include_all_fields and isinstance(data, dict):

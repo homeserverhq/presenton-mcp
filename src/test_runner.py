@@ -722,7 +722,7 @@ async def main():
                 else {"id": FAKE_ID, "slides": []},
             )
         if RUN_LLM:
-            slide_id = ""
+            edit_pres_id = ""
             pres_result = await session.call_tool("list_all_presentations", {"include_all_fields": True})
             pres_data = extract_content(pres_result)
             all_pres = get_list_items(pres_data)
@@ -740,24 +740,24 @@ async def main():
                 if isinstance(detail_data, dict):
                     slides = detail_data.get("slides", [])
                     if slides:
-                        slide_id = slides[0].get("id", "")
-                        log(f"  Found slide_id={slide_id} from presentation={pid}")
+                        edit_pres_id = pid
+                        log(f"  Found presentation={pid} with {len(slides)} slides")
                         break
-            if slide_id:
-                log(f"  Using slide_id={slide_id}")
+            if edit_pres_id:
+                log(f"  Using presentation_id={edit_pres_id}")
             else:
-                log(f"  No slides found in any presentation, using FAKE_ID (expected 404)")
+                log(f"  No presentations with slides found, using FAKE_ID (expected 404)")
             await run_test_with_store(
                 session, "47 edit_slide", "edit_slide",
-                {"id": slide_id or FAKE_ID, "prompt": "improve this slide"},
+                {"presentation_id": edit_pres_id or FAKE_ID, "index": 0, "prompt": "improve this slide"},
                 store_key="edit_slide",
                 timeout=LLM_TEST_TIMEOUT,
             )
             edit_data = store.get("edit_slide", {})
-            slide_id_2 = ""
-            if isinstance(edit_data, dict):
-                slide_id_2 = edit_data.get("id", "")
-            if not slide_id_2:
+            edit_pres_id_2 = ""
+            if isinstance(edit_data, dict) and edit_data.get("id"):
+                edit_pres_id_2 = edit_pres_id
+            if not edit_pres_id_2:
                 pres_result = await session.call_tool("list_all_presentations", {"include_all_fields": True})
                 pres_data = extract_content(pres_result)
                 all_pres = get_list_items(pres_data)
@@ -775,13 +775,13 @@ async def main():
                     if isinstance(detail_data, dict):
                         slides = detail_data.get("slides", [])
                         if slides:
-                            slide_id_2 = slides[0].get("id", "")
+                            edit_pres_id_2 = pid
                             break
-            if slide_id_2:
-                log(f"  Using slide_id for edit_slide_html={slide_id_2}")
+            if edit_pres_id_2:
+                log(f"  Using presentation_id for edit_slide_html={edit_pres_id_2}")
             await run_test(
                 session, "48 edit_slide_html", "edit_slide_html",
-                {"id": slide_id_2 or FAKE_ID, "prompt": "make it beautiful", "html": "<p>hello</p>"},
+                {"presentation_id": edit_pres_id_2 or FAKE_ID, "index": 0, "prompt": "make it beautiful", "html": "<p>hello</p>"},
                 timeout=LLM_TEST_TIMEOUT,
             )
 
