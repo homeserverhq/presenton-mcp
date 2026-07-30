@@ -175,18 +175,6 @@ class LayoutObject(BaseModel):
     components: list[LayoutComponent] = Field(description="Components")
 
 
-class CreatePresentationParam(BaseModel):
-    content: str = Field(description="Markdown content (e.g. '# My Talk\\n\\nIntroduction...')")
-    n_slides: Optional[int] = Field(default=None, description="Number of slides (e.g. 10)")
-    language: str = Field(default="", description="Language code (e.g. 'en')")
-    tone: str = Field(default="default", description="Presentation tone. One of: default, professional, casual, enthusiastic, informative, humorous, inspiring, persuasive, formal, friendly, creative, witty, educational, motivational, or storytelling (Default: default)")
-    verbosity: str = Field(default="standard", description="Content verbosity. One of: standard, concise, detailed, comprehensive, or brief (Default: standard)")
-    instructions: str = Field(default="", description="Additional AI instructions (e.g. 'Use simple language')")
-    include_table_of_contents: bool = Field(default=False, description="Include table of contents: true or false")
-    include_title_slide: bool = Field(default=True, description="Include title slide: true or false")
-    web_search: bool = Field(default=False, description="Enable web search: true or false")
-
-
 class UpdatePresentationParam(BaseModel):
     id: str = Field(description="Presentation ID (e.g. 'a1b2c3d4-...')")
     content: Optional[str] = Field(default=None, description="Updated markdown content (e.g. '# Updated Content')")
@@ -201,15 +189,16 @@ class UpdatePresentationParam(BaseModel):
 
 
 class GeneratePresentationAsyncParam(BaseModel):
-    content: str = Field(description="Content to generate slides from (e.g. '# AI Trends\\n\\nOverview...')")
-    n_slides: Optional[int] = Field(default=None, description="Number of slides (e.g. 10)")
-    instructions: Optional[str] = Field(default=None, description="Additional AI instructions (e.g. 'Focus on benefits')")
+    content: str = Field(description="Content to generate the presentation from (e.g. '# AI Trends\\n\\nOverview...')")
+    n_slides: Optional[int] = Field(default=None, description="Number of slides to generate (e.g. 10)")
+    instructions: Optional[str] = Field(default=None, description="Additional instructions for the AI (e.g. 'Focus on benefits')")
     tone: str = Field(default="default", description="Presentation tone. One of: default, casual, professional, funny, educational, or sales_pitch (Default: default)")
     verbosity: str = Field(default="standard", description="Content verbosity. One of: concise, standard, or text-heavy (Default: standard)")
     language: Optional[str] = Field(default=None, description="Language code (e.g. 'en')")
     template: str = Field(default="general", description="Template name (e.g. 'general') (Default: general)")
     include_table_of_contents: bool = Field(default=False, description="Include table of contents: true or false")
     include_title_slide: bool = Field(default=True, description="Include title slide: true or false")
+    web_search: bool = Field(default=False, description="Enable web search for content enrichment: true or false")
 
 
 class EditPresentationParam(BaseModel):
@@ -265,7 +254,7 @@ class ChatMessageParam(BaseModel):
 
 
 # =============================================================================
-# Presentation Management Tools (11 tools)
+# Presentation Management Tools (9 tools)
 # =============================================================================
 
 
@@ -305,33 +294,41 @@ async def get_presentation_by_id(
 async def create_presentation(
     content: str,
     n_slides: Optional[int] = None,
-    language: str = "",
+    instructions: Optional[str] = None,
     tone: str = "default",
     verbosity: str = "standard",
-    instructions: str = "",
+    language: Optional[str] = None,
+    template: str = "general",
     include_table_of_contents: bool = False,
     include_title_slide: bool = True,
     web_search: bool = False,
     ctx: Context = None,
 ) -> dict[str, Any]:
-    """Create a new presentation from markdown content.
+    """Create a new presentation with AI-generated slides. This runs asynchronously — returns a task_id immediately. Poll get_async_task_status with the task_id until status is "completed", then use the presentation_id from the task data to fetch the presentation.
 
     Args:
-        content: Markdown content of the presentation (e.g. '# My Talk\\n\\nIntroduction...').
-        n_slides: Number of slides to generate. 0 for auto (e.g. 10).
-        language: Language code for the presentation content (e.g. 'en').
-        tone: Presentation tone. One of: default, professional, casual, enthusiastic, informative, humorous, inspiring, persuasive, formal, friendly, creative, witty, educational, motivational, or storytelling (Default: default).
-        verbosity: Content verbosity. One of: standard, concise, detailed, comprehensive, or brief (Default: standard).
-        instructions: Additional instructions for the AI generator (e.g. 'Use simple language').
-        include_table_of_contents: Include a table of contents slide: true or false.
-        include_title_slide: Include a title slide: true or false.
+        content: The content to generate the presentation from (e.g. '# AI Trends\\n\\nOverview...').
+        n_slides: Number of slides to generate (e.g. 10).
+        instructions: Additional instructions for the AI (e.g. 'Focus on benefits').
+        tone: The tone of the presentation. One of: default, casual, professional, funny, educational, or sales_pitch (Default: default).
+        verbosity: The verbosity level. One of: concise, standard, or text-heavy (Default: standard).
+        language: The language for the presentation (e.g. 'en').
+        template: The template to use (Default: general) (e.g. 'general').
+        include_table_of_contents: Whether to include a table of contents: true or false.
+        include_title_slide: Whether to include a title slide: true or false.
         web_search: Enable web search for content enrichment: true or false.
     """
-    params = CreatePresentationParam(
-        content=content, n_slides=n_slides, language=language,
-        tone=tone, verbosity=verbosity, instructions=instructions,
+    params = GeneratePresentationAsyncParam(
+        content=content,
+        n_slides=n_slides,
+        instructions=instructions,
+        tone=tone,
+        verbosity=verbosity,
+        language=language,
+        template=template,
         include_table_of_contents=include_table_of_contents,
-        include_title_slide=include_title_slide, web_search=web_search,
+        include_title_slide=include_title_slide,
+        web_search=web_search,
     )
     return await get_client().create_presentation(
         params.model_dump(exclude_unset=True), get_user_token(),
@@ -404,62 +401,6 @@ async def duplicate_presentation(
         id: The unique ID of the presentation to duplicate (e.g. 'a1b2c3d4-...').
     """
     return await get_client().duplicate_presentation(id, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
-
-
-@mcp.tool(tags={"write", "primary", "presenton"})
-async def generate_presentation_async(
-    content: str,
-    n_slides: Optional[int] = None,
-    instructions: Optional[str] = None,
-    tone: str = "default",
-    verbosity: str = "standard",
-    language: Optional[str] = None,
-    template: str = "general",
-    include_table_of_contents: bool = False,
-    include_title_slide: bool = True,
-    ctx: Context = None,
-) -> dict[str, Any]:
-    """Generate slides for a presentation asynchronously.
-
-    Args:
-        content: The content to generate the presentation from (e.g. '# AI Trends\\n\\nOverview...').
-        n_slides: Number of slides to generate (e.g. 10).
-        instructions: Additional instructions for the AI (e.g. 'Focus on benefits').
-        tone: The tone of the presentation. One of: default, casual, professional, funny, educational, or sales_pitch (Default: default).
-        verbosity: The verbosity level. One of: concise, standard, or text-heavy (Default: standard).
-        language: The language for the presentation (e.g. 'en').
-        template: The template to use (Default: general) (e.g. 'general').
-        include_table_of_contents: Whether to include a table of contents.
-        include_title_slide: Whether to include a title slide.
-    """
-    params = GeneratePresentationAsyncParam(
-        content=content,
-        n_slides=n_slides,
-        instructions=instructions,
-        tone=tone,
-        verbosity=verbosity,
-        language=language,
-        template=template,
-        include_table_of_contents=include_table_of_contents,
-        include_title_slide=include_title_slide,
-    )
-    return await get_client().generate_presentation_async(
-        params.model_dump(exclude_unset=True), get_user_token(),
-        include_all_fields=ALLOW_ALL_AGGREGATE,
-    )
-
-
-@mcp.tool(tags={"read", "primary", "presenton"})
-async def get_presentation_generation_status(
-    id: str,
-    ctx: Context = None,
-) -> dict[str, Any]:
-    """Check the async generation status of a presentation.
-
-    Args:
-        id: The task ID returned from generate_presentation_async (e.g. 'a1b2c3d4-...').
-    """
-    return await get_client().get_presentation_generation_status(id, get_user_token())
 
 
 @mcp.tool(tags={"write", "primary", "presenton"})
@@ -1095,7 +1036,7 @@ async def edit_slide_html(
 
 
 # =============================================================================
-# Chat & Async Operations Tools (6 tools)
+# Chat & Async Operations Tools (7 tools)
 # =============================================================================
 
 
@@ -1212,6 +1153,19 @@ async def get_async_task_status(
         id: The unique ID of the async task (e.g. 'a1b2c3d4-...').
     """
     return await get_client().get_async_task_status(id, get_user_token())
+
+
+@mcp.tool(tags={"read", "primary", "presenton"})
+async def get_presentation_generation_status(
+    id: str,
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Check the async generation status of a presentation by task ID.
+
+    Args:
+        id: The task ID returned from create_presentation (e.g. 'a1b2c3d4-...').
+    """
+    return await get_client().get_presentation_generation_status(id, get_user_token())
 
 
 # =============================================================================

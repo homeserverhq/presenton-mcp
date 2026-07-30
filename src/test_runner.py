@@ -433,16 +433,24 @@ async def main():
             {"content": make_name("test content")},
             store_key="create_presentation",
         )
+        create_resp = store.get("create_presentation", {})
+        if isinstance(create_resp, dict):
+            task_data = create_resp.get("data", {})
+            if isinstance(task_data, dict):
+                presentation_id = task_data.get("presentation_id")
+            else:
+                presentation_id = None
+        else:
+            presentation_id = None
+        if presentation_id:
+            created["presentation"] = presentation_id
         await run_test_with_store(
             session, "02 create_theme", "create_theme",
             {"name": make_name("TestTheme"), "description": "MCP test theme"},
             store_key="create_theme",
         )
 
-        presentation_id = pick_id("create_presentation")
         theme_id = pick_id("create_theme")
-        if presentation_id:
-            created["presentation"] = presentation_id
         if theme_id:
             created["theme"] = theme_id
 
@@ -493,12 +501,15 @@ async def main():
         # ------------------------------------------------------------------
         if RUN_LLM:
             log("\n=== Phase 4: Presentation LLM Tools ===")
-            await run_test_with_store(
-                session, "18 generate_presentation_async", "generate_presentation_async",
-                {"content": "A short presentation about AI trends in 2026", "n_slides": 3},
-                store_key="generate_presentation_async",
-                timeout=LLM_TEST_TIMEOUT,
-            )
+            create_task_id = pick_id("create_presentation")
+            if create_task_id:
+                task_result = await poll_async_task(session, "18 poll_create_presentation", create_task_id, timeout=LLM_TEST_TIMEOUT)
+                if task_result:
+                    task_data = task_result.get("data") or {}
+                    pid = task_data.get("presentation_id") if isinstance(task_data, dict) else None
+                    if pid:
+                        presentation_id = pid
+                        created["presentation"] = pid
             await run_test(
                 session, "19 edit_presentation", "edit_presentation",
                 {"presentation_id": presentation_id, "slides": [{"index": 0, "content": {"title": "Updated Title"}}]} if presentation_id
@@ -524,31 +535,16 @@ async def main():
             )
 
         # ------------------------------------------------------------------
-        # Phase 5: Status & Async Tools (GATED — need LLM-generated tasks)
+        # Phase 5: Status & Async Tools
         # ------------------------------------------------------------------
-        if RUN_LLM:
-            log("\n=== Phase 5: Status & Async Tools ===")
-            task_id = pick_id("generate_presentation_async")
-            await run_test(
-                session, "22 get_presentation_generation_status", "get_presentation_generation_status",
-                {"id": task_id} if task_id else {"id": FAKE_ID},
-            )
+        log("\n=== Phase 5: Status & Async Tools ===")
+        await run_test(session, "22 list_async_tasks_full", "list_async_tasks", {"include_all_fields": True})
+        create_task_id = pick_id("create_presentation")
+        if create_task_id:
             await run_test(
                 session, "23 get_async_task_status", "get_async_task_status",
-                {"id": task_id} if task_id else {"id": FAKE_ID},
+                {"id": create_task_id},
             )
-            if task_id:
-                task_result = await poll_async_task(session, "23a poll_gen_presentation", task_id, timeout=LLM_TEST_TIMEOUT)
-                if task_result:
-                    known_pres = {created.get(k) for k in ("presentation", "duplicate", "derive") if created.get(k)}
-                    list_result = await session.call_tool("list_all_presentations", {"include_all_fields": True})
-                    list_data = extract_content(list_result)
-                    for item in get_list_items(list_data):
-                        if isinstance(item, dict):
-                            pid = item.get("id")
-                            if pid and pid not in known_pres:
-                                created["generated_presentation"] = pid
-                                break
 
         # ------------------------------------------------------------------
         # Phase 6: Theme Tools
@@ -835,12 +831,6 @@ async def main():
             await run_test(
                 session, "56 delete_async_template", "delete_template_by_id",
                 {"id": async_tmpl_id},
-            )
-        gen_pres_id = created.get("generated_presentation")
-        if gen_pres_id:
-            await run_test(
-                session, "57 delete_gen_presentation", "delete_presentation_by_id",
-                {"id": gen_pres_id},
             )
 
         # ------------------------------------------------------------------

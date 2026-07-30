@@ -120,7 +120,7 @@ class PresentonClient:
     # =========================================================================
 
     async def get_all_presentations(self, api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
-        data = await self.get("/api/v1/ppt/presentation/all", api_key)
+        data = await self.get("/api/v1/ppt/presentation/all", api_key, params={"include_slides": "false"})
         if not include_all_fields and isinstance(data, list):
             data = _filter_fields(data, COMMON_FIELDS["presentation"])
         return _denormalize_response(data)
@@ -134,9 +134,9 @@ class PresentonClient:
         return _denormalize_response(data)
 
     async def create_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
-        data = await self.post("/api/v1/ppt/presentation/create", api_key, json=payload)
+        data = await self.post("/api/v1/ppt/presentation/generate/async", api_key, json=payload)
         if not include_all_fields and isinstance(data, dict):
-            data = _filter_fields(data, COMMON_FIELDS["presentation"])
+            data = _filter_fields(data, COMMON_FIELDS["async_task"])
         return _denormalize_response(data)
 
     async def update_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
@@ -152,12 +152,6 @@ class PresentonClient:
         data = await self.post(f"/api/v1/ppt/presentation/{presentation_id}/duplicate", api_key)
         if not include_all_fields and isinstance(data, dict):
             data = _filter_fields(data, COMMON_FIELDS["presentation"])
-        return _denormalize_response(data)
-
-    async def generate_presentation_async(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
-        data = await self.post("/api/v1/ppt/presentation/generate/async", api_key, json=payload)
-        if not include_all_fields and isinstance(data, dict):
-            data = _filter_fields(data, COMMON_FIELDS["async_task"])
         return _denormalize_response(data)
 
     async def get_presentation_generation_status(self, task_id: str, api_key: Optional[str] = None) -> Any:
