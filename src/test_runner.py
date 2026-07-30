@@ -394,52 +394,20 @@ async def run_verify_delete(
 FAKE_ID = "00000000-0000-0000-0000-000000000000"
 
 
-def get_slide_id() -> str:
-    try:
-        out = subprocess.run(
-            ["docker", "exec", "presenton-app", "python3", "-c",
-             "import json, sqlite3; db=sqlite3.connect('/app_data/fastapi.db'); "
-             "c=db.cursor(); "
-             "c.execute(\"SELECT s.id FROM slides s JOIN presentations p ON s.presentation = p.id \""
-             "          \"WHERE json_valid(p.layout) AND \""
-             "          \"(json_extract(p.layout, '$.slides') IS NOT NULL \""
-             "          \" OR json_extract(p.layout, '$.layouts') IS NOT NULL) \""
-             "          \"ORDER BY RANDOM() LIMIT 1\"); "
-             "r=c.fetchone(); print(r[0] if r else '')"],
-            capture_output=True, text=True, timeout=10,
-        )
-        if out.returncode == 0 and out.stdout.strip():
-            sid = out.stdout.strip()
-            if len(sid) == 32:
-                sid = f"{sid[:8]}-{sid[8:12]}-{sid[12:16]}-{sid[16:20]}-{sid[20:]}"
-            return sid
-    except Exception:
-        pass
-    return ""
-
-
 def prepopulate() -> dict[str, Any]:
     api_key = os.environ.get("API_KEY", "")
     result: dict[str, Any] = {}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    backend = "http://localhost:7531"
 
     owner_id = ""
     try:
-        out = subprocess.run(
-            ["docker", "exec", "presenton-app", "python3", "-c",
-             "import sqlite3; db=sqlite3.connect('/app_data/fastapi.db'); "
-             "c=db.cursor(); "
-             "c.execute('SELECT id FROM user LIMIT 1'); "
-             "r=c.fetchone(); "
-             "uid=r[0] if r else ''; "
-             "print(f'{uid[:8]}-{uid[8:12]}-{uid[12:16]}-{uid[16:20]}-{uid[20:]}' if len(uid)==32 else uid)"
-             ],
-            capture_output=True, text=True, timeout=10,
-        )
-        if out.returncode == 0 and out.stdout.strip():
-            owner_id = out.stdout.strip()
-            log(f"Prepop: resolved owner_id from DB={owner_id}")
+        r = httpx.get(f"{backend}/api/v1/auth/verify", headers=headers, timeout=10)
+        if r.status_code == 200:
+            owner_id = r.json().get("id", "")
+            log(f"Prepop: resolved owner_id from auth/verify={owner_id}")
     except Exception as e:
-        log(f"Prepop: DB owner_id query failed: {e}")
+        log(f"Prepop: auth/verify failed: {e}")
 
     if not owner_id:
         owner_id = str(uuid.uuid4())
@@ -463,9 +431,6 @@ def prepopulate() -> dict[str, Any]:
          "p.save('/app_data/exports/test_template.pptx')"],
         capture_output=True,
     )
-
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    backend = "http://localhost:7531"
 
     try:
         r = httpx.get(f"{backend}/api/v1/ppt/template/all?page=1&page_size=20",
@@ -794,17 +759,63 @@ async def main():
                 else {"id": FAKE_ID, "outline": "[]"},
             )
         if RUN_LLM:
-            slide_id = get_slide_id()
+            slide_id = ""
+            pres_result = await session.call_tool("list_all_presentations", {"include_all_fields": True})
+            pres_data = extract_content(pres_result)
+            all_pres = get_list_items(pres_data)
+            for pres in all_pres:
+                if not isinstance(pres, dict):
+                    continue
+                pid = pres.get("id")
+                if not pid:
+                    continue
+                detail = await session.call_tool(
+                    "get_presentation_by_id",
+                    {"id": pid, "include_all_fields": True},
+                )
+                detail_data = extract_content(detail)
+                if isinstance(detail_data, dict):
+                    slides = detail_data.get("slides", [])
+                    if slides:
+                        slide_id = slides[0].get("id", "")
+                        log(f"  Found slide_id={slide_id} from presentation={pid}")
+                        break
             if slide_id:
-                log(f"  Using real slide_id={slide_id}")
+                log(f"  Using slide_id={slide_id}")
             else:
-                log(f"  No slide in DB, using FAKE_ID (expected 404)")
-            await run_test(
+                log(f"  No slides found in any presentation, using FAKE_ID (expected 404)")
+            await run_test_with_store(
                 session, "48 edit_slide", "edit_slide",
                 {"id": slide_id or FAKE_ID, "prompt": "improve this slide"},
+                store_key="edit_slide",
                 timeout=LLM_TEST_TIMEOUT,
             )
-            slide_id_2 = get_slide_id()
+            edit_data = store.get("edit_slide", {})
+            slide_id_2 = ""
+            if isinstance(edit_data, dict):
+                slide_id_2 = edit_data.get("id", "")
+            if not slide_id_2:
+                pres_result = await session.call_tool("list_all_presentations", {"include_all_fields": True})
+                pres_data = extract_content(pres_result)
+                all_pres = get_list_items(pres_data)
+                for pres in all_pres:
+                    if not isinstance(pres, dict):
+                        continue
+                    pid = pres.get("id")
+                    if not pid:
+                        continue
+                    detail = await session.call_tool(
+                        "get_presentation_by_id",
+                        {"id": pid, "include_all_fields": True},
+                    )
+                    detail_data = extract_content(detail)
+                    if isinstance(detail_data, dict):
+                        slides = detail_data.get("slides", [])
+                        if slides:
+                            slide_id_2 = slides[0].get("id", "")
+                            break
+            if slide_id_2:
+                log(f"  Using slide_id for edit_slide_html={slide_id_2}")
             await run_test(
                 session, "49 edit_slide_html", "edit_slide_html",
                 {"id": slide_id_2 or FAKE_ID, "prompt": "make it beautiful", "html": "<p>hello</p>"},
