@@ -139,6 +139,12 @@ class PresentonClient:
             data = _filter_fields(data, COMMON_FIELDS["async_task"])
         return _denormalize_response(data)
 
+    async def bootstrap_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
+        data = await self.post("/api/v1/ppt/presentation/create", api_key, json=payload)
+        if not include_all_fields and isinstance(data, dict):
+            data = _filter_fields(data, COMMON_FIELDS["presentation"])
+        return _denormalize_response(data)
+
     async def update_presentation(self, payload: dict[str, Any], api_key: Optional[str] = None, include_all_fields: bool = False) -> Any:
         data = await self.patch("/api/v1/ppt/presentation/update", api_key, json=payload)
         if not include_all_fields and isinstance(data, dict):

@@ -201,6 +201,12 @@ class GeneratePresentationAsyncParam(BaseModel):
     web_search: bool = Field(default=False, description="Enable web search for content enrichment: true or false")
 
 
+class BootstrapPresentationParam(BaseModel):
+    content: str = Field(description="Markdown content (e.g. '# My Talk\\n\\nIntroduction...')")
+    n_slides: Optional[int] = Field(default=None, description="Number of slides (e.g. 10)")
+    language: str = Field(default="", description="Language code (e.g. 'en')")
+
+
 class EditPresentationParam(BaseModel):
     presentation_id: str = Field(description="Presentation ID (e.g. 'a1b2c3d4-...')")
     slides: list[SlideContentUpdateItem] = Field(description="Slide content updates")
@@ -254,7 +260,7 @@ class ChatMessageParam(BaseModel):
 
 
 # =============================================================================
-# Presentation Management Tools (9 tools)
+# Presentation Management Tools (10 tools)
 # =============================================================================
 
 
@@ -331,6 +337,27 @@ async def create_presentation(
         web_search=web_search,
     )
     return await get_client().create_presentation(
+        params.model_dump(exclude_unset=True), get_user_token(),
+        include_all_fields=ALLOW_ALL_AGGREGATE,
+    )
+
+
+@mcp.tool(tags={"write", "basic", "presenton"})
+async def bootstrap_presentation(
+    content: str,
+    n_slides: Optional[int] = None,
+    language: str = "",
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Create a simple presentation shell without AI processing. The content is stored directly as markdown.
+
+    Args:
+        content: Markdown content of the presentation (e.g. '# My Talk\\n\\nIntroduction...').
+        n_slides: Number of slides (e.g. 10).
+        language: Language code (e.g. 'en').
+    """
+    params = BootstrapPresentationParam(content=content, n_slides=n_slides, language=language)
+    return await get_client().bootstrap_presentation(
         params.model_dump(exclude_unset=True), get_user_token(),
         include_all_fields=ALLOW_ALL_AGGREGATE,
     )

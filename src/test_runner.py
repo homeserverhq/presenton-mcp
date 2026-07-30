@@ -429,21 +429,18 @@ async def main():
         # ------------------------------------------------------------------
         log("\n=== Phase 1: Create Resources ===")
         await run_test_with_store(
-            session, "01 create_presentation", "create_presentation",
+            session, "01 bootstrap_presentation", "bootstrap_presentation",
             {"content": make_name("test content")},
-            store_key="create_presentation",
+            store_key="bootstrap_presentation",
         )
-        create_resp = store.get("create_presentation", {})
-        if isinstance(create_resp, dict):
-            task_data = create_resp.get("data", {})
-            if isinstance(task_data, dict):
-                presentation_id = task_data.get("presentation_id")
-            else:
-                presentation_id = None
+        boot_resp = store.get("bootstrap_presentation", {})
+        if isinstance(boot_resp, dict):
+            presentation_id = boot_resp.get("id")
         else:
             presentation_id = None
         if presentation_id:
             created["presentation"] = presentation_id
+            created["bootstrap_presentation"] = presentation_id
         await run_test_with_store(
             session, "02 create_theme", "create_theme",
             {"name": make_name("TestTheme"), "description": "MCP test theme"},
@@ -501,15 +498,20 @@ async def main():
         # ------------------------------------------------------------------
         if RUN_LLM:
             log("\n=== Phase 4: Presentation LLM Tools ===")
+            await run_test_with_store(
+                session, "18 create_presentation", "create_presentation",
+                {"content": make_name("AI presentation"), "n_slides": 3},
+                store_key="create_presentation",
+            )
             create_task_id = pick_id("create_presentation")
             if create_task_id:
-                task_result = await poll_async_task(session, "18 poll_create_presentation", create_task_id, timeout=LLM_TEST_TIMEOUT)
+                task_result = await poll_async_task(session, "18b poll_create_presentation", create_task_id, timeout=LLM_TEST_TIMEOUT)
                 if task_result:
                     task_data = task_result.get("data") or {}
                     pid = task_data.get("presentation_id") if isinstance(task_data, dict) else None
                     if pid:
+                        created["llm_presentation"] = pid
                         presentation_id = pid
-                        created["presentation"] = pid
             await run_test(
                 session, "19 edit_presentation", "edit_presentation",
                 {"presentation_id": presentation_id, "slides": [{"index": 0, "content": {"title": "Updated Title"}}]} if presentation_id
@@ -584,29 +586,30 @@ async def main():
             session, "30 get_template_by_id", "get_template_by_id",
             {"id": tmpl_id} if tmpl_id else {"id": FAKE_ID},
         )
-        await run_test_with_store(
-            session, "31 create_template_async", "create_template_async",
-            {
-                "pptx_url": "/app_data/exports/test_template.pptx",
-                "slide_image_urls": ["/app_data/templates/standard/static/thumbnail.png"],
-                "name": make_name("async-template"),
-            },
-            store_key="create_template_async",
-        )
-        async_data = store.get("create_template_async", {})
-        async_task_id = async_data.get("id") if isinstance(async_data, dict) else None
-        if async_task_id:
-            task_result = await poll_async_task(session, "31a verify template_task", async_task_id)
-            if task_result:
-                tmpl_name = make_name("async-template")
-                list_result = await session.call_tool("list_all_templates", {})
-                list_data = extract_content(list_result)
-                for item in get_list_items(list_data):
-                    if isinstance(item, dict) and item.get("name") == tmpl_name:
-                        tid = item.get("id")
-                        if tid:
-                            created["async_template"] = tid
-                            break
+        if RUN_LLM:
+            await run_test_with_store(
+                session, "31 create_template_async", "create_template_async",
+                {
+                    "pptx_url": "/app_data/exports/test_template.pptx",
+                    "slide_image_urls": ["/app_data/templates/standard/static/thumbnail.png"],
+                    "name": make_name("async-template"),
+                },
+                store_key="create_template_async",
+            )
+            async_data = store.get("create_template_async", {})
+            async_task_id = async_data.get("id") if isinstance(async_data, dict) else None
+            if async_task_id:
+                task_result = await poll_async_task(session, "31a verify template_task", async_task_id)
+                if task_result:
+                    tmpl_name = make_name("async-template")
+                    list_result = await session.call_tool("list_all_templates", {})
+                    list_data = extract_content(list_result)
+                    for item in get_list_items(list_data):
+                        if isinstance(item, dict) and item.get("name") == tmpl_name:
+                            tid = item.get("id")
+                            if tid:
+                                created["async_template"] = tid
+                                break
         await run_test_with_store(
             session, "32 create_template_init", "create_template_init",
             {
@@ -818,18 +821,30 @@ async def main():
             session, "53 delete_template_by_id", "delete_template_by_id",
             {"id": custom_template_id} if custom_template_id else {"id": FAKE_ID},
         )
-        await run_test(
-            session, "54 delete_original_presentation", "delete_presentation_by_id",
-            {"id": presentation_id} if presentation_id else {"id": FAKE_ID},
-        )
-        await run_verify_delete(
-            session, "55 verify_presentation_deleted", "get_presentation_by_id",
-            {"id": presentation_id} if presentation_id else {"id": FAKE_ID},
-        )
+        llm_pid = created.get("llm_presentation")
+        if llm_pid:
+            await run_test(
+                session, "54 delete_llm_presentation", "delete_presentation_by_id",
+                {"id": llm_pid},
+            )
+            await run_verify_delete(
+                session, "55 verify_llm_deleted", "get_presentation_by_id",
+                {"id": llm_pid},
+            )
+        bootstrap_id = created.get("bootstrap_presentation")
+        if bootstrap_id:
+            await run_test(
+                session, "56 delete_original_presentation", "delete_presentation_by_id",
+                {"id": bootstrap_id},
+            )
+            await run_verify_delete(
+                session, "57 verify_presentation_deleted", "get_presentation_by_id",
+                {"id": bootstrap_id},
+            )
         async_tmpl_id = created.get("async_template")
         if async_tmpl_id:
             await run_test(
-                session, "56 delete_async_template", "delete_template_by_id",
+                session, "58 delete_async_template", "delete_template_by_id",
                 {"id": async_tmpl_id},
             )
 
