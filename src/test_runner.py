@@ -144,7 +144,7 @@ def is_error(result: dict[str, Any]) -> Optional[str]:
             if c.get("type") == "text":
                 txt = c["text"]
                 if txt.startswith("Error calling tool"):
-                    return txt.split(":", 1)[1].strip() if ":" in txt else txt
+                    return txt.split(":", 1)[1].strip()
                 try:
                     data = json.loads(txt)
                 except json.JSONDecodeError:
@@ -240,6 +240,51 @@ async def _run_leak_detection(session: MCPSession) -> None:
 
 
 LLM_TEST_TIMEOUT = 120
+POLL_INTERVAL = 3
+
+
+async def poll_async_task(
+    session: MCPSession,
+    label: str,
+    task_id: str,
+    timeout: int = 120,
+) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        result = await session.call_tool("get_async_task_status", {"id": task_id})
+        err = is_error(result)
+        if err:
+            results.append({
+                "label": label, "tool": "get_async_task_status", "status": "FAILED",
+                "reason": err,
+            })
+            log(f"  FAIL {label}: {err}")
+            return False
+        data = extract_content(result)
+        if isinstance(data, dict):
+            status = data.get("status", "")
+            if status == "completed":
+                results.append({
+                    "label": label, "tool": "get_async_task_status", "status": "PASSED",
+                    "data": data,
+                })
+                log(f"  PASS {label}")
+                return True
+            if status == "failed":
+                msg = data.get("message", "Task failed")
+                results.append({
+                    "label": label, "tool": "get_async_task_status", "status": "FAILED",
+                    "reason": msg,
+                })
+                log(f"  FAIL {label}: {msg}")
+                return False
+        await asyncio.sleep(POLL_INTERVAL)
+    results.append({
+        "label": label, "tool": "get_async_task_status", "status": "FAILED",
+        "reason": f"Timed out after {timeout}s",
+    })
+    log(f"  FAIL {label}: Timed out after {timeout}s")
+    return False
 
 
 async def run_test(
@@ -380,24 +425,25 @@ def prepopulate() -> dict[str, Any]:
     owner_id = ""
     try:
         out = subprocess.run(
-            ["docker", "exec", "presenton-app", "ls", "/tmp/presenton/"],
+            ["docker", "exec", "presenton-app", "python3", "-c",
+             "import sqlite3; db=sqlite3.connect('/app_data/fastapi.db'); "
+             "c=db.cursor(); "
+             "c.execute('SELECT id FROM user LIMIT 1'); "
+             "r=c.fetchone(); "
+             "uid=r[0] if r else ''; "
+             "print(f'{uid[:8]}-{uid[8:12]}-{uid[12:16]}-{uid[16:20]}-{uid[20:]}' if len(uid)==32 else uid)"
+             ],
             capture_output=True, text=True, timeout=10,
         )
-        if out.returncode == 0:
-            dirs = [d.strip() for d in out.stdout.strip().split("\n") if d.strip()]
-            uuid_dirs = [d for d in dirs if len(d) == 36 and d.count("-") == 4]
-            if uuid_dirs:
-                owner_id = uuid_dirs[0]
+        if out.returncode == 0 and out.stdout.strip():
+            owner_id = out.stdout.strip()
+            log(f"Prepop: resolved owner_id from DB={owner_id}")
     except Exception as e:
-        log(f"Prepop: owner_id scan failed: {e}")
+        log(f"Prepop: DB owner_id query failed: {e}")
 
     if not owner_id:
         owner_id = str(uuid.uuid4())
-        subprocess.run(
-            ["docker", "exec", "presenton-app", "mkdir", "-p", f"/tmp/presenton/{owner_id}"],
-            capture_output=True, timeout=10,
-        )
-        log(f"Prepop: created owner_id={owner_id}")
+        log(f"Prepop: generated fallback owner_id={owner_id}")
 
     result["owner_id"] = owner_id
     subprocess.run(
@@ -621,13 +667,19 @@ async def main():
             session, "30 get_template_by_id", "get_template_by_id",
             {"id": tmpl_id} if tmpl_id else {"id": FAKE_ID},
         )
-        await run_test(
+        await run_test_with_store(
             session, "31 create_template_async", "create_template_async",
             {
-                "pptx_url": "/data/nonexistent.pptx",
-                "slide_image_urls": ["/static/icons/placeholder.svg"],
+                "pptx_url": "/app_data/exports/test_template.pptx",
+                "slide_image_urls": [slide_image_url] if slide_image_url else ["/static/icons/placeholder.svg"],
+                "name": make_name("async-template"),
             },
+            store_key="create_template_async",
         )
+        async_data = store.get("create_template_async", {})
+        async_task_id = async_data.get("task_id") if isinstance(async_data, dict) else None
+        if async_task_id:
+            await poll_async_task(session, "31a verify template_task", async_task_id)
         await run_test_with_store(
             session, "32 create_template_init", "create_template_init",
             {
@@ -752,9 +804,10 @@ async def main():
                 {"id": slide_id or FAKE_ID, "prompt": "improve this slide"},
                 timeout=LLM_TEST_TIMEOUT,
             )
+            slide_id_2 = get_slide_id()
             await run_test(
                 session, "49 edit_slide_html", "edit_slide_html",
-                {"id": slide_id or FAKE_ID, "prompt": "make it beautiful", "html": "<p>hello</p>"},
+                {"id": slide_id_2 or FAKE_ID, "prompt": "make it beautiful", "html": "<p>hello</p>"},
                 timeout=LLM_TEST_TIMEOUT,
             )
 
