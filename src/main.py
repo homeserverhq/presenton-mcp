@@ -4,6 +4,7 @@ from contextvars import ContextVar
 from typing import Any, Optional, Union
 
 from fastmcp import FastMCP, Context
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 from toon_mcp import json_to_toon
 
@@ -264,7 +265,9 @@ class ChatMessageParam(BaseModel):
 # =============================================================================
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="List All Presentations", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_presentations(
     include_all_fields: bool = False,
     ctx: Context = None,
@@ -281,7 +284,9 @@ async def list_all_presentations(
     return {"items": json_to_toon(data)}
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Get Presentation By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_presentation_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -296,7 +301,9 @@ async def get_presentation_by_id(
     return await get_client().get_presentation_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 
-@mcp.tool(tags={"write", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Create Presentation", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_presentation(
     content: str,
     n_slides: Optional[int] = None,
@@ -342,7 +349,9 @@ async def create_presentation(
     )
 
 
-@mcp.tool(tags={"write", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Bootstrap Presentation", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def bootstrap_presentation(
     content: str,
     n_slides: Optional[int] = None,
@@ -363,7 +372,9 @@ async def bootstrap_presentation(
     )
 
 
-@mcp.tool(tags={"write", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Update Presentation", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_presentation(
     id: str,
     content: Optional[str] = None,
@@ -403,7 +414,9 @@ async def update_presentation(
     return await get_client().update_presentation(p, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
-@mcp.tool(tags={"write", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Delete Presentation By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_presentation_by_id(
     id: str,
     ctx: Context = None,
@@ -417,7 +430,9 @@ async def delete_presentation_by_id(
     return {"deleted": True, "id": id}
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Duplicate Presentation", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def duplicate_presentation(
     id: str,
     ctx: Context = None,
@@ -430,7 +445,9 @@ async def duplicate_presentation(
     return await get_client().duplicate_presentation(id, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Edit Presentation", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def edit_presentation(
     presentation_id: str,
     slides: list[SlideContentUpdateItem],
@@ -455,7 +472,9 @@ async def edit_presentation(
     )
 
 
-@mcp.tool(tags={"write", "advanced", "presenton"})
+@mcp.tool(
+    tags={"advanced", "presenton"}, annotations=ToolAnnotations(title="Derive Presentation", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def derive_presentation(
     presentation_id: str,
     slides: list[SlideContentUpdateItem],
@@ -480,7 +499,9 @@ async def derive_presentation(
     )
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Prepare Presentation", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def prepare_presentation(
     id: str,
     outlines: list[SlideOutlineItem],
@@ -504,7 +525,9 @@ async def prepare_presentation(
 # =============================================================================
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="List All Templates", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_templates(
     include_all_fields: bool = False,
     page: int = 1,
@@ -528,7 +551,9 @@ async def list_all_templates(
     return {"items": json_to_toon(items)}
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Get Template By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_template_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -543,7 +568,9 @@ async def get_template_by_id(
     return await get_client().get_template_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Create Template Async", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_template_async(
     pptx_url: str,
     slide_image_urls: list[str],
@@ -573,7 +600,9 @@ async def create_template_async(
     return await get_client().create_template_async(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Create Template Init", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_template_init(
     pptx_url: str,
     slide_image_urls: list[str],
@@ -601,7 +630,9 @@ async def create_template_init(
     return {"id": template_id}
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Create Template Layouts", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_template_layouts(
     template_id: str,
     index: Optional[int] = None,
@@ -623,7 +654,9 @@ async def create_template_layouts(
     return await get_client().create_template_layouts(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
-@mcp.tool(tags={"write", "advanced", "presenton"})
+@mcp.tool(
+    tags={"advanced", "presenton"}, annotations=ToolAnnotations(title="Generate Template Blocks", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def generate_template_blocks(
     template_id: str,
     ctx: Context = None,
@@ -637,7 +670,9 @@ async def generate_template_blocks(
     return await get_client().generate_template_blocks(payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Update Template Layouts", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_template_layouts(
     template_id: str,
     index: Optional[int] = None,
@@ -663,7 +698,9 @@ async def update_template_layouts(
     return await get_client().update_template_layouts(template_id, payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
-@mcp.tool(tags={"write", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Update Template", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_template(
     id: str,
     name: Optional[str] = None,
@@ -685,7 +722,9 @@ async def update_template(
     return await get_client().update_template(id, payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
-@mcp.tool(tags={"write", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Delete Template By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_template_by_id(
     id: str,
     ctx: Context = None,
@@ -704,7 +743,9 @@ async def delete_template_by_id(
 # =============================================================================
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="List Default Themes", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_default_themes(
     include_all_fields: bool = False,
     ctx: Context = None,
@@ -721,7 +762,9 @@ async def list_default_themes(
     return {"items": json_to_toon(data)}
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="List All Themes", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_themes(
     include_all_fields: bool = False,
     ctx: Context = None,
@@ -738,7 +781,9 @@ async def list_all_themes(
     return {"items": json_to_toon(data)}
 
 
-@mcp.tool(tags={"write", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Create Theme", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def create_theme(
     name: str,
     description: str = "",
@@ -764,7 +809,9 @@ async def create_theme(
     )
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Update Theme", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_theme(
     id: str,
     name: Optional[str] = None,
@@ -790,7 +837,9 @@ async def update_theme(
     return await get_client().update_theme(id, p, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
-@mcp.tool(tags={"write", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Delete Theme By Id", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_theme_by_id(
     id: str,
     ctx: Context = None,
@@ -804,7 +853,9 @@ async def delete_theme_by_id(
     return {"deleted": True, "id": id}
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Generate Theme", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def generate_theme(
     primary: Optional[str] = None,
     background: Optional[str] = None,
@@ -843,7 +894,9 @@ async def generate_theme(
 # =============================================================================
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="Search Stock Images", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+)
 async def search_stock_images(
     query: str,
     limit: int = 12,
@@ -862,7 +915,9 @@ async def search_stock_images(
     return {"items": json_to_toon(data) if isinstance(data, list) else data}
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Generate Image", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True)
+)
 async def generate_image(
     prompt: str,
     ctx: Context = None,
@@ -878,7 +933,9 @@ async def generate_image(
     return result
 
 
-@mcp.tool(tags={"read", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="List Generated Images", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_generated_images(
     include_all_fields: bool = False,
     ctx: Context = None,
@@ -895,7 +952,9 @@ async def list_generated_images(
     return {"items": json_to_toon(data)}
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="List Uploaded Images", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_uploaded_images(
     include_all_fields: bool = False,
     ctx: Context = None,
@@ -912,7 +971,9 @@ async def list_uploaded_images(
     return {"items": json_to_toon(data)}
 
 
-@mcp.tool(tags={"read", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Search Icons", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+)
 async def search_icons(
     query: str,
     limit: int = 20,
@@ -933,7 +994,9 @@ async def search_icons(
 # =============================================================================
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="List All Fonts", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_all_fonts(
     include_all_fields: bool = False,
     ctx: Context = None,
@@ -950,7 +1013,9 @@ async def list_all_fonts(
     return {"items": json_to_toon(data)}
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="List Uploaded Fonts", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_uploaded_fonts(
     include_all_fields: bool = False,
     ctx: Context = None,
@@ -967,7 +1032,9 @@ async def list_uploaded_fonts(
     return {"items": json_to_toon(data)}
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Decompose File", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def decompose_file(
     file_paths: list[str],
     language: str = "",
@@ -991,7 +1058,9 @@ async def decompose_file(
 # =============================================================================
 
 
-@mcp.tool(tags={"read", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Get Outline By Id", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_outline_by_id(
     id: str,
     include_all_fields: bool = False,
@@ -1006,7 +1075,9 @@ async def get_outline_by_id(
     return await get_client().get_outline_by_id(id, get_user_token(), include_all_fields=include_all_fields)
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Update Outline", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_outline(
     id: str,
     slides: list[SlideOutlineItem],
@@ -1022,7 +1093,9 @@ async def update_outline(
     return await get_client().update_outline(id, payload, get_user_token(), include_all_fields=ALLOW_ALL_AGGREGATE)
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Edit Slide", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def edit_slide(
     presentation_id: str,
     index: int,
@@ -1044,7 +1117,9 @@ async def edit_slide(
     )
 
 
-@mcp.tool(tags={"write", "advanced", "presenton"})
+@mcp.tool(
+    tags={"advanced", "presenton"}, annotations=ToolAnnotations(title="Edit Slide Html", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def edit_slide_html(
     presentation_id: str,
     index: int,
@@ -1073,7 +1148,9 @@ async def edit_slide_html(
 # =============================================================================
 
 
-@mcp.tool(tags={"read", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="List Chat Conversations", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_chat_conversations(
     presentation_id: str,
     include_all_fields: bool = False,
@@ -1092,7 +1169,9 @@ async def list_chat_conversations(
     return {"items": json_to_toon(data)}
 
 
-@mcp.tool(tags={"read", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Get Chat History", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_chat_history(
     presentation_id: str,
     conversation_id: str,
@@ -1112,7 +1191,9 @@ async def get_chat_history(
     )
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Delete Chat Conversation", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_chat_conversation(
     presentation_id: str,
     conversation_id: str,
@@ -1130,7 +1211,9 @@ async def delete_chat_conversation(
     return {"deleted": True, "conversation_id": conversation_id}
 
 
-@mcp.tool(tags={"write", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Send Chat Message", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+)
 async def send_chat_message(
     presentation_id: str,
     message: str,
@@ -1158,7 +1241,9 @@ async def send_chat_message(
     )
 
 
-@mcp.tool(tags={"read", "basic", "presenton"})
+@mcp.tool(
+    tags={"basic", "presenton"}, annotations=ToolAnnotations(title="List Async Tasks", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def list_async_tasks(
     include_all_fields: bool = False,
     ctx: Context = None,
@@ -1175,7 +1260,9 @@ async def list_async_tasks(
     return {"items": json_to_toon(data)}
 
 
-@mcp.tool(tags={"read", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Get Async Task Status", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_async_task_status(
     id: str,
     ctx: Context = None,
@@ -1188,7 +1275,9 @@ async def get_async_task_status(
     return await get_client().get_async_task_status(id, get_user_token())
 
 
-@mcp.tool(tags={"read", "primary", "presenton"})
+@mcp.tool(
+    tags={"primary", "presenton"}, annotations=ToolAnnotations(title="Get Presentation Generation Status", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def get_presentation_generation_status(
     id: str,
     ctx: Context = None,
